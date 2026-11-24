@@ -451,8 +451,29 @@ struct MainWindow: View {
   }
 }
 
+private enum AppTheme: String, CaseIterable {
+  case system, light, dark
+
+  var title: String {
+    switch self {
+    case .system: "Системная"
+    case .light: "Светлая"
+    case .dark: "Тёмная"
+    }
+  }
+
+  var appearance: NSAppearance? {
+    switch self {
+    case .system: nil
+    case .light: NSAppearance(named: .aqua)
+    case .dark: NSAppearance(named: .darkAqua)
+    }
+  }
+}
+
 struct ProxyGuardApp: App {
   @StateObject private var control = Control()
+  @AppStorage("appTheme") private var theme: AppTheme = .system
   @Environment(\.openWindow) private var openWindow
   var body: some Scene {
     Window("Lobotomy Proxy", id: "main") {
@@ -461,6 +482,7 @@ struct ProxyGuardApp: App {
         NSApp.activate(ignoringOtherApps: true)
       }
     }.windowStyle(.hiddenTitleBar).defaultSize(width: 960, height: 746)
+      .onChange(of: theme, initial: true) { NSApp.appearance = theme.appearance }
 
     let shield = control.menuShield
     MenuBarExtra {
@@ -472,6 +494,11 @@ struct ProxyGuardApp: App {
         openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
       }
+      Picker("Тема", selection: $theme) {
+        ForEach(AppTheme.allCases, id: \.self) { option in
+          Text(option.title).tag(option)
+        }
+      }.pickerStyle(.menu)
     } label: {
       let description = "Lobotomy Proxy — " + shield.title
       Image(nsImage: NSImage(systemSymbolName: shield.symbol, accessibilityDescription: description)!)

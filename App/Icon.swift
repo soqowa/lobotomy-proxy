@@ -38,10 +38,8 @@ enum IconMaker {
     context.imageInterpolation = .high
     let tile = NSBezierPath(
       roundedRect: NSRect(x: 77, y: 77, width: 870, height: 870), xRadius: 202, yRadius: 202)
-    NSGradient(
-      starting: NSColor(srgbRed: 0.73, green: 0.28, blue: 0.47, alpha: 1),
-      ending: NSColor(srgbRed: 0.45, green: 0.11, blue: 0.27, alpha: 1))!
-      .draw(in: tile, angle: -70)
+    NSColor.white.setFill()
+    tile.fill()
     let width: CGFloat = 803
     let height = width * mark.size.height / mark.size.width
     mark.draw(in: NSRect(x: (1024 - width) / 2, y: (1024 - height) / 2, width: width, height: height))
