@@ -5,13 +5,11 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -102,7 +100,11 @@ func (c Config) upstream(ctx context.Context, host string, port int) (net.Conn, 
 		}
 	}()
 	conn := raw
-	conn.SetDeadline(time.Now().Add(9 * time.Second))
+	handshakeDeadline := time.Now().Add(9 * time.Second)
+	if end, ok := ctx.Deadline(); ok && end.Before(handshakeDeadline) {
+		handshakeDeadline = end
+	}
+	conn.SetDeadline(handshakeDeadline)
 	if c.Kind == "https" {
 		t := tls.Client(raw, &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12})
 		if err = t.HandshakeContext(ctx); err != nil {
@@ -215,13 +217,18 @@ func (c Config) get(ctx context.Context, host, path string) ([]byte, error) {
 		return nil, err
 	}
 	defer n.Close()
-	n.SetDeadline(time.Now().Add(10 * time.Second))
+	deadline := time.Now().Add(10 * time.Second)
+	if end, ok := ctx.Deadline(); ok && end.Before(deadline) {
+		deadline = end
+	}
+	n.SetDeadline(deadline)
 	t := tls.Client(n, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 	if err = t.HandshakeContext(ctx); err != nil {
 		return nil, errors.New(message("TLS verification of the diagnostic service failed"))
 	}
 	req, _ := http.NewRequest("GET", "https://"+host+path, nil)
 	req.Close = true
+	req.Header.Set("Cache-Control", "no-cache")
 	if err = req.Write(t); err != nil {
 		return nil, err
 	}
@@ -231,41 +238,10 @@ func (c Config) get(ctx context.Context, host, path string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf(message("diagnostic service %s returned HTTP %d"), host, resp.StatusCode)
+		return nil, &diagnosticHTTPError{host, resp.StatusCode, resp.Header.Get("Retry-After")}
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, 32768))
-}
-func probe(c Config) (Report, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
-	defer cancel()
-	b, err := c.get(ctx, "ipinfo.io", "/json")
-	if err != nil {
-		return Report{}, err
-	}
-	var r struct{ IP, Country, Timezone string }
-	if json.Unmarshal(b, &r) != nil || r.Timezone == "" || !safeZone(r.Timezone) || len(r.Country) != 2 {
-		return Report{}, errors.New(message("could not determine the exit time zone"))
-	}
-	ip, err := netip.ParseAddr(r.IP)
-	if err != nil {
-		return Report{}, errors.New(message("invalid public IP"))
-	}
-	b, err = c.get(ctx, "www.cloudflare.com", "/cdn-cgi/trace")
-	if err != nil {
-		return Report{}, err
-	}
-	trace := map[string]string{}
-	for _, line := range strings.Split(string(b), "\n") {
-		k, v, ok := strings.Cut(line, "=")
-		if ok {
-			trace[k] = strings.TrimSpace(v)
-		}
-	}
-	cross, err := netip.ParseAddr(trace["ip"])
-	if err != nil || ip.Unmap() != cross.Unmap() || trace["loc"] != r.Country {
-		return Report{}, errors.New(message("diagnostic services reported different exits"))
-	}
-	return Report{ip.String(), r.Country, r.Timezone}, nil
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 32768))
+	return body, err
 }
 func safeZone(s string) bool {
 	if s == "" || s == "Local" || strings.Contains(s, "..") || strings.HasPrefix(s, "/") {

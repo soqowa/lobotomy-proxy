@@ -56,6 +56,8 @@ To change the app’s appearance, open **menu bar shield → Theme** and choose 
 
 ## DNS and route checks
 
+Protected connections use the configured proxy and local filter rules. The relay verifies the exit through the proxy about every 40 seconds. Two independent HTTPS services must agree on the public IP and country. For an unchanged exit, the relay keeps the verified time zone in memory for up to one hour. A changed exit needs a fresh time zone check. Cloudflare Trace and Country check the IP and country while the cached time zone is valid. IPWho supplies a fresh time zone on startup, after an exit change and when the cached time zone expires. If a service times out or rate-limits requests, the relay tries the remaining services, including ifconfig.co when a fresh zone is needed. Forwarding stays closed unless the checks pass. [Country API](https://country.is/) · [IPWho API](https://ipwhois.io/documentation) · [ifconfig.co](https://ifconfig.co/)
+
 In **Overview → Leak check**, open Net.Coffee in a protected browser to inspect the DNS resolvers, WebRTC/UDP results, and time zone it observes. The profile covers `ip.net.coffee` and its test subdomains, so you can also check DNS in a regular window of a supported default browser. [Open the Net.Coffee test](https://ip.net.coffee/claude/)
 
 For **Berlin · CryptoStorm** DNS mode, enter the proxy host as a numeric IP address. The app sends DNS-over-HTTPS requests through the proxy, connects to the returned IPs, and blocks the request if DNS resolution fails. [CryptoStorm resolver details](https://cryptostorm.is/blog/doh)

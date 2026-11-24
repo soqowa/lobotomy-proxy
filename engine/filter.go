@@ -375,6 +375,7 @@ func worker(c Config) error {
 		epoch int
 	}
 	rc := make(chan result, 1)
+	probe := exitProbe{get: c.get}
 	epoch := 0
 	checking := false
 	next := time.Time{}
@@ -436,7 +437,7 @@ func worker(c Config) error {
 			checking = true
 			next = time.Now().Add(40 * time.Second)
 			stamp := epoch
-			go func() { r, e := probe(c); rc <- result{r, e, stamp} }()
+			go func() { r, e := probe.check(); rc <- result{r, e, stamp} }()
 		}
 	}
 }
@@ -490,7 +491,8 @@ func main() {
 			}
 		} else if os.Args[1] == "probe" {
 			var r Report
-			r, e = probe(c)
+			manual := exitProbe{get: c.get}
+			r, e = manual.check()
 			if e == nil {
 				emit("tested", message("Exit verified"), &r)
 			}

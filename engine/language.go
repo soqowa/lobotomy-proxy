@@ -34,6 +34,8 @@ func browserLanguage(header string) string {
 }
 
 var russianMessages = map[string]string{
+	"invalid exit data from %s":                                      "некорректные данные о выходе от %s",
+	"waiting before retrying %s":                                     "ожидание перед повторным запросом к %s",
 	"App profile → local proxy":                                      "Профиль приложения → локальный прокси",
 	"Berlin DNS is unavailable: %w":                                  "берлинский DNS недоступен: %w",
 	"Berlin DNS returned HTTP %d (%s)":                               "берлинский DNS вернул HTTP %d (%s)",
