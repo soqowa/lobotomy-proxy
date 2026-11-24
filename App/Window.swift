@@ -1,0 +1,425 @@
+import AppKit
+import SwiftUI
+
+let accent = Color(
+  nsColor: NSColor(name: nil) { look in
+    look.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+      ? NSColor(srgbRed: 0.42, green: 0.8, blue: 0.72, alpha: 1)
+      : NSColor(srgbRed: 0.04, green: 0.40, blue: 0.34, alpha: 1)
+  })
+
+struct InterfaceMotion {
+  let reduced: Bool
+
+  var animation: Animation? { reduced ? nil : .smooth(duration: 0.24) }
+  var page: AnyTransition {
+    reduced ? .identity : .asymmetric(
+      insertion: .opacity.combined(with: .offset(y: 6)), removal: .opacity)
+  }
+  var item: AnyTransition {
+    reduced ? .identity : .opacity.combined(with: .scale(scale: 0.96))
+  }
+}
+
+private struct ConnectionSignal: View {
+  enum State {
+    case idle, connecting, verified, failed
+
+    var symbol: String {
+      switch self {
+      case .idle, .connecting: "shield"
+      case .verified: "checkmark.shield.fill"
+      case .failed: "xmark.shield"
+      }
+    }
+
+    var tint: Color {
+      switch self {
+      case .verified: accent
+      case .failed: .orange
+      case .idle, .connecting: .secondary
+      }
+    }
+  }
+
+  let state: State
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  var body: some View {
+    HStack(spacing: 4) {
+      Image(systemName: "laptopcomputer")
+      ZStack {
+        Capsule().fill(.secondary.opacity(0.25)).frame(height: 2)
+        switch state {
+        case .connecting:
+          if reduceMotion {
+            Image(systemName: "ellipsis").font(.caption.bold())
+          } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { frame in
+              let progress = frame.date.timeIntervalSinceReferenceDate
+                .truncatingRemainder(dividingBy: 1.2) / 1.2
+              Capsule().fill(accent).frame(width: 8, height: 4)
+                .opacity(min(1, min(progress, 1 - progress) * 8))
+                .offset(x: CGFloat(progress - 0.5) * 24)
+            }
+          }
+        case .verified:
+          Capsule().fill(accent).frame(height: 2)
+            .transition(.scale(scale: 0, anchor: .leading))
+        case .idle, .failed:
+          EmptyView()
+        }
+      }.frame(width: 32, height: 10)
+      Image(systemName: state.symbol).frame(width: 17)
+        .foregroundStyle(state.tint)
+    }
+    .font(.system(size: 14, weight: .medium)).foregroundStyle(.secondary)
+    .animation(state == .verified && !reduceMotion ? .smooth(duration: 0.22) : nil, value: state)
+    .accessibilityHidden(true)
+  }
+}
+
+struct Surface<Content: View>: View {
+  @ViewBuilder let content: () -> Content
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16, content: content)
+      .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+      .background(.background, in: RoundedRectangle(cornerRadius: 14))
+      .overlay(RoundedRectangle(cornerRadius: 14).stroke(.primary.opacity(0.085), lineWidth: 1))
+  }
+}
+
+struct Dashboard: View {
+  @ObservedObject var c: Control
+  private var signal: ConnectionSignal.State {
+    guard c.active else { return .idle }
+    switch c.phase {
+    case "checking": return .connecting
+    case "passing": return .verified
+    case "blocked": return .failed
+    default: return .idle
+    }
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 26) {
+      Text("Обзор").font(.largeTitle.bold())
+      Surface {
+        HStack(spacing: 14) {
+          ConnectionSignal(state: signal)
+          Text(c.status).font(.title2.weight(.semibold))
+          Spacer()
+          if c.active {
+            Button("Приостановить") { c.stop() }.disabled(c.busy)
+          } else if c.browserRules && c.system.filter && c.system.files && c.system.dns {
+            Button("Включить передачу") { c.start() }.disabled(c.busy)
+          }
+        }
+        if let r = c.route {
+          Divider()
+          HStack(spacing: 24) {
+            metric("Внешний IP", r.ip)
+            metric("Страна", r.country)
+            metric("Пояс выхода", r.zone)
+          }
+        }
+      }
+      if !c.issues.isEmpty {
+        VStack(alignment: .leading, spacing: 12) {
+          Text("Что требует внимания").font(.headline)
+          Surface {
+            ForEach(Array(c.issues.enumerated()), id: \.element.id) { i, issue in
+              if i > 0 { Divider() }
+              Button {
+                if issue.page == .overview { c.start() } else { c.page = issue.page }
+              } label: {
+                HStack(spacing: 12) {
+                  VStack(alignment: .leading, spacing: 4) {
+                    Text(issue.title).fontWeight(.medium)
+                    Text(issue.detail).font(.callout).foregroundStyle(.secondary)
+                  }
+                  Spacer()
+                  Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                }.contentShape(Rectangle())
+              }.buttonStyle(.plain)
+            }
+          }
+        }
+      }
+      Divider()
+      VStack(alignment: .leading, spacing: 9) {
+        Text("Проверка утечек").font(.headline)
+        if c.diagnosticsBrowsers.isEmpty {
+          if c.defaultManagedBrowser != nil {
+            Button("Проверить DNS в браузере") { c.openDNSPage() }
+              .disabled(c.busy || c.phase != "passing" || !c.diagnosticRuleInstalled)
+          } else {
+            Text("Для проверки в отдельном приложении добавьте поддерживаемый браузер в фильтр.")
+              .font(.callout).foregroundStyle(.secondary)
+          }
+        } else if c.diagnosticsBrowsers.count == 1, let browser = c.diagnosticsBrowsers.first {
+          Button("Открыть Net.Coffee в " + browser.name) { c.openDiagnostics(browser) }.disabled(
+            c.busy || c.phase != "passing" || !c.browserRules)
+        } else {
+          Menu("Открыть Net.Coffee") {
+            ForEach(c.diagnosticsBrowsers) { a in Button(a.name) { c.openDiagnostics(a) } }
+          }
+          .fixedSize().disabled(c.busy || c.phase != "passing" || !c.browserRules)
+        }
+      }
+    }
+  }
+  func metric(_ label: String, _ value: String) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(label).font(.caption).foregroundStyle(.secondary)
+      Text(value).font(.body.monospacedDigit()).textSelection(.enabled)
+    }
+  }
+}
+
+struct Connection: View {
+  @ObservedObject var c: Control
+  @State private var extra = false
+  @State private var restore = false
+  private var probeSignal: ConnectionSignal.State {
+    if c.isTestingProxy { return .connecting }
+    if !c.probeFailed.isEmpty { return .failed }
+    return c.dnsObservations.isEmpty ? .idle : .verified
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 24) {
+      Text("Подключение").font(.largeTitle.bold())
+      Surface {
+        HStack {
+          Text("Прокси-сервер").font(.headline)
+          Spacer()
+          Picker("Протокол", selection: $c.settings.kind) {
+            Text("SOCKS5").tag("socks5")
+            Text("HTTP").tag("http")
+            Text("HTTPS").tag("https")
+          }.labelsHidden().pickerStyle(.segmented).frame(width: 210)
+        }
+        HStack(spacing: 14) {
+          field("Сервер") { TextField("proxy.example.com", text: $c.settings.host) }
+          field("Порт") {
+            TextField("1080", value: $c.settings.port, format: .number.grouping(.never))
+          }.frame(width: 86)
+        }
+        HStack(spacing: 14) {
+          field("Логин") { TextField("Необязательно", text: $c.settings.user) }
+          field("Пароль") { SecureField("Необязательно", text: $c.settings.password) }
+        }
+        Picker("DNS защищённых запросов", selection: Binding(
+          get: { c.settings.dnsMode ?? "upstream" }, set: { c.settings.dnsMode = $0 }
+        )) {
+          Text("Резолвер прокси").tag("upstream")
+          Text("Берлин · CryptoStorm").tag("berlin")
+        }
+        if !c.dnsObservations.isEmpty {
+          LabeledContent("DNS в Net.Coffee",
+            value: c.dnsObservations.map(\.label).joined(separator: "\n"))
+            .font(.callout).textSelection(.enabled)
+        }
+        DisclosureGroup("IP прокси для подключения без DNS", isExpanded: $extra) {
+          TextField("Числовой IP сервера", text: $c.settings.address).padding(.top, 6)
+        }.font(.callout).foregroundStyle(.secondary)
+        HStack(spacing: 14) {
+          Button("Проверить и сохранить") { c.test() }.buttonStyle(.borderedProminent).disabled(
+            c.busy || c.settings.host.isEmpty)
+          ConnectionSignal(state: probeSignal)
+        }
+      }.textFieldStyle(.roundedBorder)
+      Text("Часовой пояс").font(.title3.weight(.semibold))
+      Surface {
+        LabeledContent("На Mac", value: c.system.zone).monospacedDigit()
+        LabeledContent(
+          "На выходе прокси",
+          value: c.route?.zone
+            ?? (c.system.proxyZone.isEmpty ? "Ещё не проверен" : c.system.proxyZone)
+        ).monospacedDigit()
+        Divider()
+        Text(
+          "Приложения в фильтре получают пояс прокси при запуске. Здесь можно также изменить пояс всего Mac."
+        ).font(.callout).foregroundStyle(.secondary)
+        HStack {
+          Button("Применить к Mac") { c.applySystemZone() }.disabled(
+            c.busy || c.settings.host.isEmpty)
+          Spacer()
+          Button("Откатить пояс…") { restore = true }.buttonStyle(.link).disabled(
+            c.busy || !(c.system.ownsZone ?? c.system.systemWide))
+        }
+      }
+    }.alert("Откатить часовой пояс Mac?", isPresented: $restore) {
+      Button("Отмена", role: .cancel) {}
+      Button("Откатить") { c.restoreZone() }
+    } message: {
+      Text("Proxy Guard вернёт сохранённый пояс, если он всё ещё управляет настройкой.")
+    }
+  }
+  func field<V: View>(_ label: String, @ViewBuilder _ content: () -> V) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      Text(label).font(.caption).foregroundStyle(.secondary)
+      content().labelsHidden().accessibilityLabel(label)
+    }
+  }
+}
+
+struct MainWindow: View {
+  @ObservedObject var c: Control
+  @ScaledMetric(relativeTo: .body) private var sidebarWidth: CGFloat = 210
+  @Namespace private var navigation
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  var body: some View {
+    let motion = InterfaceMotion(reduced: reduceMotion)
+    HStack(spacing: 0) {
+      VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 9) {
+          Image(systemName: "shield.lefthalf.filled").font(.system(size: 21, weight: .semibold))
+            .foregroundStyle(accent)
+          Text("Proxy Guard").font(.title3.weight(.semibold)).fixedSize()
+        }.accessibilityElement(children: .combine).padding(.horizontal, 10).padding(.bottom, 20)
+        ForEach(Page.allCases) { p in
+          Button {
+            c.page = p
+          } label: {
+            HStack(spacing: 11) {
+              Image(systemName: p.icon).frame(width: 20)
+              Text(p.rawValue).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+              Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 11).padding(.vertical, 9).contentShape(Rectangle())
+          }.buttonStyle(.plain).background {
+            if c.page == p {
+              RoundedRectangle(cornerRadius: 8).fill(accent.opacity(0.13))
+                .matchedGeometryEffect(id: "selection", in: navigation)
+                .accessibilityHidden(true).allowsHitTesting(false)
+            }
+          }
+          .foregroundStyle(c.page == p ? accent : .primary).accessibilityAddTraits(
+            c.page == p ? .isSelected : [])
+        }
+        Spacer()
+      }.animation(motion.animation, value: c.page)
+      .padding(.horizontal, 12).padding(.top, 23).frame(width: sidebarWidth).background(
+        .regularMaterial)
+      Divider()
+      VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+          ScrollView {
+            Group {
+              switch c.page {
+              case .overview: Dashboard(c: c)
+              case .connection: Connection(c: c)
+              case .filter: FilterView(c: c, motion: motion)
+              }
+            }
+            .frame(maxWidth: 720, alignment: .leading).padding(32).frame(
+              maxWidth: .infinity, alignment: .center)
+          }.id(c.page).transition(motion.page)
+        }.clipped().animation(motion.animation, value: c.page)
+        if c.busy || !c.notice.isEmpty {
+          Divider()
+          HStack(spacing: 10) {
+            if c.busy {
+              ProgressView().controlSize(.small)
+            } else {
+              Image(systemName: "info.circle").foregroundStyle(accent)
+            }
+            Text(c.notice).font(.callout).textSelection(.enabled)
+            Spacer()
+            if !c.busy {
+              Button {
+                c.notice = ""
+              } label: {
+                Image(systemName: "xmark")
+              }.buttonStyle(.plain).accessibilityLabel("Скрыть сообщение")
+            }
+          }.padding(.vertical, 10).padding(.horizontal, 22).background(.bar)
+        }
+      }.frame(maxWidth: .infinity, maxHeight: .infinity).background(
+        Color(nsColor: .windowBackgroundColor))
+    }.tint(accent).frame(minWidth: 790, minHeight: 600)
+  }
+}
+@main enum ProxyGuardEntry {
+  @MainActor static func main() {
+    if CommandLine.arguments.dropFirst().elementsEqual(["--relay-worker"]) {
+      do { try BackgroundRelay.execWorker() } catch {
+        if let data = try? JSONEncoder().encode(
+          Event(state: "blocked", message: error.localizedDescription, report: nil))
+        {
+          FileHandle.standardOutput.write(data + Data([10]))
+        }
+        exit(1)
+      }
+    }
+    let args = Array(CommandLine.arguments.dropFirst())
+    if args == ["--background-relay"] {
+      NSApplication.shared.setActivationPolicy(.prohibited)
+      DispatchQueue.global(qos: .utility).async { BackgroundRelay.supervise() }
+      RunLoop.main.run()
+      exit(0)
+    }
+    if args == ["--check-dns"] || args == ["--set-berlin-dns"] {
+      do {
+        var config = try Vault.read()
+        if args == ["--set-berlin-dns"] { config.dnsMode = "berlin" }
+        let observations = try config.observedDNS(requireBerlin: config.dnsMode == "berlin")
+        FileHandle.standardOutput.write(try JSONEncoder().encode(observations) + Data([10]))
+        if args == ["--set-berlin-dns"] {
+          try Vault.save(config)
+          if try BackgroundRelay.owned(), BackgroundRelay.loaded() {
+            _ = try Tools.run(BackgroundRelay.ctl, ["kickstart", "-k", BackgroundRelay.domain + "/" + BackgroundRelay.label])
+          }
+        }
+        exit(0)
+      } catch {
+        FileHandle.standardError.write(Data((error.localizedDescription + "\n").utf8))
+        exit(1)
+      }
+    }
+    if args == ["--profile-status"] {
+      let system = try? JSONDecoder().decode(
+        SystemState.self, from: Tools.run(Tools.engine, ["system"]))
+      let report = Profile.report(system?.policy)
+      print(report.condition.rawValue + " · " + report.detail)
+      exit(0)
+    }
+    if args == ["--export-profile"] {
+      do {
+        let policy = try JSONDecoder().decode(
+          FilterPolicy.self, from: FileHandle.standardInput.readDataToEndOfFile()
+        ).systemRules.normalized()
+        FileHandle.standardOutput.write(try Profile.data(policy))
+        exit(0)
+      } catch {
+        FileHandle.standardError.write(Data(error.localizedDescription.utf8))
+        exit(1)
+      }
+    }
+    if CommandLine.arguments.contains("--import-stdin") {
+      do {
+        let config = try JSONDecoder().decode(
+          Settings.self, from: FileHandle.standardInput.readDataToEndOfFile())
+        try Vault.save(config)
+        exit(0)
+      } catch {
+        FileHandle.standardError.write(Data("Keychain import failed\n".utf8))
+        exit(1)
+      }
+    }
+    ProxyGuardApp.main()
+  }
+}
+
+struct ProxyGuardApp: App {
+  @StateObject private var control = Control()
+  var body: some Scene {
+    Window("Proxy Guard", id: "main") {
+      MainWindow(c: control).onAppear {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+      }
+    }.defaultSize(width: 960, height: 746)
+  }
+}

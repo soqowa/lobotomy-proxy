@@ -1,0 +1,16 @@
+.DS_Store
+.build/
+build/
+dist/
+Deliverables/
+__pycache__/
+*.app
+*.zip
+*.dmg
+*.p12
+*.p8
+*.key
+*.pem
+*.mobileconfig
+.env
+.env.*

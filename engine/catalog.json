@@ -1,0 +1,86 @@
+{
+  "presets": [
+    {
+      "name": "Claude",
+      "domains": [
+        "anthropic.com",
+        "claude.ai",
+        "claude.com",
+        "claudeusercontent.com",
+        "claudemcpcontent.com"
+      ],
+      "id": "claude"
+    },
+    {
+      "name": "Gemini",
+      "domains": [
+        "gemini.google.com",
+        "aistudio.google.com",
+        "generativelanguage.googleapis.com"
+      ],
+      "id": "gemini"
+    },
+    {
+      "name": "OpenAI",
+      "domains": [
+        "openai.com",
+        "chatgpt.com",
+        "oaistatic.com",
+        "oaiusercontent.com"
+      ],
+      "id": "openai"
+    },
+    {
+      "name": "Grok",
+      "domains": [
+        "grok.com",
+        "x.ai"
+      ],
+      "id": "grok"
+    }
+  ],
+  "apps": [
+    {
+      "id": "com.google.Chrome",
+      "name": "Google Chrome",
+      "adapter": "chromium",
+      "port": 17741
+    },
+    {
+      "id": "com.microsoft.edgemac",
+      "name": "Microsoft Edge",
+      "adapter": "chromium",
+      "port": 17742
+    },
+    {
+      "id": "com.brave.Browser",
+      "name": "Brave",
+      "adapter": "chromium",
+      "port": 17743
+    },
+    {
+      "id": "company.thebrowser.Browser",
+      "name": "Arc",
+      "adapter": "chromium",
+      "port": 17744
+    },
+    {
+      "id": "com.vivaldi.Vivaldi",
+      "name": "Vivaldi",
+      "adapter": "chromium",
+      "port": 17745
+    },
+    {
+      "id": "org.mozilla.firefox",
+      "name": "Firefox",
+      "adapter": "firefox",
+      "port": 17746
+    },
+    {
+      "id": "com.anthropic.claudefordesktop",
+      "name": "Claude Desktop",
+      "adapter": "desktop",
+      "port": 17747
+    }
+  ]
+}

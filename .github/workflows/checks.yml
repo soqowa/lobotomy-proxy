@@ -1,0 +1,41 @@
+name: macOS checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: '1.25.x'
+          cache-dependency-path: engine/go.sum
+      - name: Test and vet the network engine
+        working-directory: engine
+        run: |
+          go test -race ./...
+          go vet ./...
+      - name: Check profile generation
+        run: python3 Tests/profile.py
+      - name: Build and verify the universal app
+        run: |
+          app="$RUNNER_TEMP/Proxy Guard.app"
+          ./build.sh "$app"
+          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/ProxyGuard"
+          lipo -verify_arch arm64 x86_64 "$app/Contents/Helpers/proxyguard"
+          codesign --verify --deep --strict "$app"
