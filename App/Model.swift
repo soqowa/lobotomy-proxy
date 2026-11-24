@@ -271,9 +271,11 @@ enum Page: String, CaseIterable, Identifiable {
     draft = draft.fullApplications
     do { try BackgroundRelay.refreshInstalledJob() } catch { notice = error.localizedDescription }
     refresh()
-    timer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
+    let poll = Timer(timeInterval: 4, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.refresh() }
     }
+    timer = poll
+    RunLoop.main.add(poll, forMode: .common)
   }
   func refresh() {
     guard !refreshing, !busy else { return }
@@ -345,6 +347,18 @@ enum Page: String, CaseIterable, Identifiable {
       return phase == "blocked" || !active ? "Передача закрыта" : "Ожидание проверки"
     }
     return "Правила не установлены"
+  }
+  var menuShield: (symbol: String, title: String, detail: String?) {
+    if busy || !inspected { return ("shield", "Проверяем настройки", nil) }
+    if !active {
+      return ("shield.slash", "Передача выключена", system.installed ? nil : "Правила не установлены")
+    }
+    if phase == "checking" { return ("shield", status, nil) }
+    if phase == "passing", system.installed, Tools.supportsInstalledFilter(system.installedDigest) {
+      if issuesForApps.isEmpty { return ("checkmark.shield.fill", status, nil) }
+      return ("exclamationmark.shield", status, issuesForApps.joined(separator: ", "))
+    }
+    return ("xmark.shield", "Маршрут не подтверждён", issues.first?.detail ?? relayMessage)
   }
   var updateNeeded: Bool {
     guard draftLoaded else { return false }

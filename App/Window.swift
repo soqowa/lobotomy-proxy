@@ -453,6 +453,7 @@ struct MainWindow: View {
 
 struct ProxyGuardApp: App {
   @StateObject private var control = Control()
+  @Environment(\.openWindow) private var openWindow
   var body: some Scene {
     Window("Lobotomy Proxy", id: "main") {
       MainWindow(c: control).onAppear {
@@ -460,5 +461,23 @@ struct ProxyGuardApp: App {
         NSApp.activate(ignoringOtherApps: true)
       }
     }.windowStyle(.hiddenTitleBar).defaultSize(width: 960, height: 746)
+
+    let shield = control.menuShield
+    MenuBarExtra {
+      Text(shield.title)
+      if let detail = shield.detail, !detail.isEmpty { Text(detail) }
+      Divider()
+      Button("Открыть обзор") {
+        control.page = .overview
+        openWindow(id: "main")
+        NSApp.activate(ignoringOtherApps: true)
+      }
+    } label: {
+      let description = "Lobotomy Proxy — " + shield.title
+      Image(nsImage: NSImage(systemSymbolName: shield.symbol, accessibilityDescription: description)!)
+        .renderingMode(.template)
+        .accessibilityLabel(Text(verbatim: description))
+        .help(description)
+    }.menuBarExtraStyle(.menu)
   }
 }
