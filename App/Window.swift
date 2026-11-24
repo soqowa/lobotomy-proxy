@@ -44,7 +44,9 @@ private struct Sidebar: View {
             Text(item.rawValue).lineLimit(1).fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 0)
           }
-          .padding(.horizontal, 11).padding(.vertical, 9).contentShape(Rectangle())
+          .font(.title3)
+          .padding(.horizontal, 12).padding(.vertical, 10)
+          .frame(minHeight: 42).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background {
