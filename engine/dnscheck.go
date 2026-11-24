@@ -56,7 +56,7 @@ func checkDNS(c Config) ([]DNSObservation, error) {
 		}
 	}
 	if len(seen.IPs) == 0 || len(seen.IPs) > 32 {
-		return nil, errors.New("Net.Coffee не подтвердил адрес DNS")
+		return nil, errors.New(message("Net.Coffee could not verify the DNS address"))
 	}
 	var result []DNSObservation
 	for _, s := range seen.IPs {

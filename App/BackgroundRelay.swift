@@ -42,7 +42,7 @@ enum BackgroundRelay {
         as? [String: Any],
       spec["Label"] as? String == label, let args = spec["ProgramArguments"] as? [String],
       jobHost(args) != nil
-    else { throw GuardError.message("Файл фоновой службы занят другой настройкой.") }
+    else { throw GuardError.message(localized("Another configuration owns the background service file.")) }
     return true
   }
   static func loaded() -> Bool {
@@ -52,7 +52,7 @@ enum BackgroundRelay {
     let exists = try owned()
     if loaded() {
       guard exists else {
-        throw GuardError.message("Найден одноимённый фоновый процесс без файла Lobotomy Proxy.")
+        throw GuardError.message(localized("A background process with the same name is running without a Lobotomy Proxy service file."))
       }
       _ = try Tools.run(ctl, ["bootout", domain + "/" + label])
     }
@@ -74,18 +74,20 @@ enum BackgroundRelay {
     guard registered == host || registered == previous || !FileManager.default.fileExists(atPath: args[0])
     else { return }
     let environment = spec["EnvironmentVariables"] as? [String: String]
-    if args[0] != executable.path || environment?["PROXYGUARD_RELAY_BUILD"] != buildID || !loaded() {
+    if args[0] != executable.path || environment?["PROXYGUARD_RELAY_BUILD"] != buildID
+      || environment?[AppLanguage.environmentKey] != AppLanguage.current || !loaded()
+    {
       try enable()
     }
   }
   static func enable() throws {
     let exe = executable
     guard FileManager.default.isExecutableFile(atPath: exe.path) else {
-      throw GuardError.message("Фоновая служба отсутствует в сборке.")
+      throw GuardError.message(localized("The background service is missing from this build."))
     }
     let spec: [String: Any] = [
       "Label": label, "ProgramArguments": [exe.path, "--background-relay"],
-      "EnvironmentVariables": ["PROXYGUARD_RELAY_BUILD": buildID],
+      "EnvironmentVariables": ["PROXYGUARD_RELAY_BUILD": buildID, AppLanguage.environmentKey: AppLanguage.current],
       "RunAtLoad": true, "KeepAlive": true, "ThrottleInterval": 5, "ProcessType": "Background",
     ]
     let data = try PropertyListSerialization.data(fromPropertyList: spec, format: .xml, options: 0)
@@ -95,7 +97,7 @@ enum BackgroundRelay {
     let previous = exists ? try Data(contentsOf: plist) : nil
     let running = loaded()
     if running && !exists {
-      throw GuardError.message("Найден одноимённый фоновый процесс без файла Lobotomy Proxy.")
+      throw GuardError.message(localized("A background process with the same name is running without a Lobotomy Proxy service file."))
     }
     if let previous, previous != data {
       // Keep a valid job on disk throughout the upgrade, including across a logout.
@@ -139,7 +141,7 @@ enum BackgroundRelay {
     let source = Pipe()
     let output = Pipe()
     let lock = NSLock()
-    var event = Event(state: "checking", message: "Проверяем маршрут.", report: nil)
+    var event = Event(state: "checking", message: localized("Checking the route."), report: nil)
     init(zone: String) throws {
       process.executableURL = Tools.host.executableURL
       process.arguments = ["--relay-worker"]
@@ -183,9 +185,9 @@ enum BackgroundRelay {
   // worker over an anonymous descriptor, then replace this process with that worker.
   static func execWorker() throws -> Never {
     let value = try JSONEncoder().encode(Vault.read())
-    guard value.count < 4096 else { throw GuardError.message("Слишком длинные параметры прокси.") }
+    guard value.count < 4096 else { throw GuardError.message(localized("The proxy settings are too long.")) }
     var fds: [Int32] = [-1, -1]
-    guard pipe(&fds) == 0 else { throw GuardError.message("Канал передачи недоступен.") }
+    guard pipe(&fds) == 0 else { throw GuardError.message(localized("The connection channel is unavailable.")) }
     let output = FileHandle(fileDescriptor: fds[1], closeOnDealloc: false)
     defer { close(fds[0]) }
     try output.write(contentsOf: value)
@@ -193,8 +195,9 @@ enum BackgroundRelay {
     let path = Tools.engine.path
     let argv = [path, "relay-worker", String(fds[0])].map { strdup($0) } + [nil]
     defer { for item in argv { free(item) } }
+    setenv(AppLanguage.environmentKey, AppLanguage.current, 1)
     _ = argv.withUnsafeBufferPointer { execv(path, $0.baseAddress!) }
-    throw GuardError.message("Не удалось запустить обработчик прокси.")
+    throw GuardError.message(localized("Couldn’t start the proxy worker."))
   }
   static func supervise() {
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -209,7 +212,7 @@ enum BackgroundRelay {
             Tools.supportsInstalledFilter(system.installedDigest), system.installed,
             system.files, system.dns, system.filter, !system.legacyFilter,
             let policy = system.policy
-          else { throw GuardError.message("Системные правила не подтверждены.") }
+          else { throw GuardError.message(localized("System rules haven’t been verified.")) }
           let report = Profile.report(policy)
           guard report.condition == .current else { throw GuardError.message(report.detail) }
           let ids = Set(policy.applications.map(\.id))
@@ -221,7 +224,7 @@ enum BackgroundRelay {
               Event(
                 state: "blocked",
                 message: last.state == "checking"
-                  ? "Обработчик завершился до проверки соединения." : last.message, report: nil))
+                  ? localized("The worker stopped before it could verify the connection.") : last.message, report: nil))
             ended.stop()
             worker = nil
             return

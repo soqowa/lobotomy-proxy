@@ -61,7 +61,7 @@ func setClock(uid int, zone string, restore bool) error {
 		return e
 	}
 	if uid < 501 || s.UID != 0 && s.UID != uid {
-		return errors.New("не удалось подтвердить владельца настройки")
+		return errors.New(message("could not verify ownership of the settings"))
 	}
 	if e = detachClock(&s); e != nil {
 		return e
@@ -71,11 +71,11 @@ func setClock(uid int, zone string, restore bool) error {
 		return e
 	}
 	if ledger.UID != uid {
-		return errors.New("настройка пояса принадлежит другому пользователю")
+		return errors.New(message("another user owns the time zone setting"))
 	}
 	current := currentZone()
 	if !safeZone(current) {
-		return errors.New("не удалось прочитать часовой пояс Mac")
+		return errors.New(message("could not read the Mac’s time zone"))
 	}
 	if restore {
 		if previous := ledger.previousZone(current); previous != "" {
@@ -89,7 +89,7 @@ func setClock(uid int, zone string, restore bool) error {
 		return os.Remove(zoneFile)
 	}
 	if !safeZone(zone) {
-		return errors.New("неверный пояс выхода")
+		return errors.New(message("invalid exit time zone"))
 	}
 	if e = applyTimeZone(&ledger, zone, true, current, changeZone, saveClock); e != nil {
 		return e
@@ -187,7 +187,7 @@ func waitForZone(z string, read func() string, until time.Time, delay time.Durat
 }
 func changeZone(z string) error {
 	if !safeZone(z) {
-		return errors.New("некорректный часовой пояс")
+		return errors.New(message("invalid time zone"))
 	}
 	cmd := exec.Command("/usr/sbin/systemsetup", "-settimezone", z)
 	_, err := cmd.CombinedOutput()
@@ -201,7 +201,7 @@ func changeZone(z string) error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("смена часового пояса: %w", err)
+		return fmt.Errorf(message("changing the time zone: %w"), err)
 	}
-	return fmt.Errorf("запрошен пояс %s, macOS сообщает %s. Повторите проверку в «Подключении»", z, currentZone())
+	return fmt.Errorf(message("requested time zone %s, but macOS reports %s. Run the check again in Connection"), z, currentZone())
 }

@@ -17,7 +17,9 @@ with tempfile.TemporaryDirectory() as tmp:
         "CFBundlePackageType": "APPL",
     }))
     shutil.copy(project / "engine/catalog.json", bundle / "Resources")
-    sources = ["Model", "ZoneLaunch", "FilterPolicy", "DomainSelection", "ProfileStatus", "BackgroundRelay"]
+    shutil.copytree(project / "App/Resources/ru.lproj", bundle / "Resources/ru.lproj")
+    sources = ["Localization", "Model", "ZoneLaunch", "FilterPolicy", "DomainSelection", "ProfileStatus", "BackgroundRelay"]
     subprocess.run(["swiftc", "-parse-as-library", *[project / "App" / (name + ".swift") for name in sources],
                     project / "Tests/PolicyFixture.swift", "-o", exe], check=True)
-    subprocess.run([exe], check=True)
+    for languages, expected in [("(ru-RU,en)", "ru"), ("(en-US,ru)", "en"), ("(hy-AM,ru)", "en")]:
+        subprocess.run([exe, "-AppleLanguages", languages, expected], check=True)

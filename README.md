@@ -38,7 +38,7 @@ Place **Lobotomy Proxy.app** next to **Proxy Guard.app** and open the new versio
 
 ## Quick start
 
-The app currently uses Russian labels. The sidebar sections, from top to bottom, are **Overview**, **Connection**, and **Filter**.
+The app follows your Mac’s primary language. Russian selects the Russian interface. Every other language selects English, even if Russian appears later in your preferred languages. Reopen the app after changing the language in System Settings.
 
 1. **Connect your proxy.** In Connection, choose HTTP, HTTPS, or SOCKS5 and enter the host, port, and credentials. Test and save the connection. The app checks the exit IP against two services, tests DNS, and stores the credentials in your macOS Keychain.
 2. **Choose what to route.** In Filter, add individual domains or select one or more presets. Each domain includes its subdomains. Add an app to route all of its supported web traffic through the proxy.

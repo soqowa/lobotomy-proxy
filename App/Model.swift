@@ -21,9 +21,9 @@ extension Settings {
   func observedDNS(requireBerlin: Bool) throws -> [DNSObservation] {
     let output = try Tools.run(Tools.engine, ["dns-check"], input: JSONEncoder().encode(self))
     let results = try JSONDecoder().decode([DNSObservation].self, from: output)
-    guard !results.isEmpty else { throw GuardError.message("Net.Coffee не увидел DNS-резолвер.") }
+    guard !results.isEmpty else { throw GuardError.message(localized("Net.Coffee didn’t detect a DNS resolver.")) }
     if requireBerlin && !results.allSatisfy({ $0.country_code.lowercased() == "de" && $0.city.lowercased() == "berlin" }) {
-      throw GuardError.message("Net.Coffee не подтвердил Берлин. " + results.map(\.label).joined(separator: ", "))
+      throw GuardError.message(localized("Net.Coffee couldn’t verify Berlin. %@", results.map(\.label).joined(separator: ", ")))
     }
     return results
   }
@@ -69,7 +69,7 @@ enum Vault {
     let rc = SecItemCopyMatching(q as CFDictionary, &item)
     if rc == errSecItemNotFound { return Settings() }
     guard rc == errSecSuccess, let data = item as? Data else {
-      throw GuardError.message("Связка ключей недоступна (\(rc)).")
+      throw GuardError.message(localized("Keychain is unavailable (%d).", rc))
     }
     return try JSONDecoder().decode(Settings.self, from: data)
   }
@@ -82,7 +82,7 @@ enum Vault {
       rc = SecItemAdd(q as CFDictionary, nil)
     }
     guard rc == errSecSuccess else {
-      throw GuardError.message("Связка ключей отклонила запись (\(rc)).")
+      throw GuardError.message(localized("Keychain rejected the update (%d).", rc))
     }
   }
 }
@@ -110,6 +110,11 @@ enum Tools {
     let source = Pipe()
     p.executableURL = url
     p.arguments = args
+    if url == engine {
+      var environment = ProcessInfo.processInfo.environment
+      environment[AppLanguage.environmentKey] = AppLanguage.current
+      p.environment = environment
+    }
     p.standardOutput = output
     p.standardError = output
     p.standardInput = source
@@ -130,7 +135,7 @@ enum Tools {
       let msg = String(decoding: data.prefix(1200), as: UTF8.self).trimmingCharacters(
         in: .whitespacesAndNewlines)
       throw GuardError.message(
-        msg.isEmpty ? "Команда завершилась с кодом \(p.terminationStatus)." : msg)
+        msg.isEmpty ? localized("The command exited with code %d.", p.terminationStatus) : msg)
     }
     return data
   }
@@ -138,7 +143,7 @@ enum Tools {
     guard
       let digest = Bundle.main.object(forInfoDictionaryKey: "LobotomyProxyHelperSHA256") as? String,
       digest.count == 64, digest.allSatisfy({ $0.isHexDigit })
-    else { throw GuardError.message("В сборке отсутствует контрольная сумма службы.") }
+    else { throw GuardError.message(localized("The service checksum is missing from this build.")) }
     let stage = #"""
       set -eu
       umask 077
@@ -149,7 +154,8 @@ enum Tools {
       test "${actual%% *}" = "$2"
       /usr/bin/codesign --verify --strict "$stage/helper"
       /bin/chmod 0700 "$stage/helper"
-      shift 2
+      export LOBOTOMY_PROXY_LANGUAGE="$3"
+      shift 3
       "$stage/helper" "$@"
       """#
     let script = """
@@ -162,13 +168,18 @@ enum Tools {
       end run
       """
     _ = try run(
-      URL(fileURLWithPath: "/usr/bin/osascript"), ["-e", script, stage, engine.path, digest] + args)
+      URL(fileURLWithPath: "/usr/bin/osascript"), ["-e", script, stage, engine.path, digest, AppLanguage.current] + args)
   }
 }
 enum Page: String, CaseIterable, Identifiable {
-  case overview = "Обзор"
-  case connection = "Подключение"
-  case filter = "Фильтр"
+  case overview, connection, filter
+  var title: String {
+    switch self {
+    case .overview: localized("Overview")
+    case .connection: localized("Connection")
+    case .filter: localized("Filter")
+    }
+  }
   var id: Self { self }
   var icon: String {
     switch self {
@@ -239,13 +250,13 @@ enum Page: String, CaseIterable, Identifiable {
     let panel = NSOpenPanel()
     panel.allowedContentTypes = [.applicationBundle]
     panel.directoryURL = URL(fileURLWithPath: "/Applications")
-    panel.prompt = "Добавить"
+    panel.prompt = localized("Add")
     guard panel.runModal() == .OK, let url = panel.url else { return }
     guard let id = Bundle(url: url)?.bundleIdentifier,
       let app = FilterCatalog.shared.apps.first(where: { $0.id == id })
     else {
       notice =
-        "Для этого приложения нет поддерживаемой обязательной настройки прокси. Его трафик по-прежнему обрабатывают общие доменные правила."
+        localized("This app has no supported managed proxy setting. Its traffic still follows the shared domain rules.")
       return
     }
     addApp(app)
@@ -315,7 +326,7 @@ enum Page: String, CaseIterable, Identifiable {
       phase =
         enabled && browserRules && system.filter && system.files && system.dns
         ? (event?.state ?? "blocked") : "blocked"
-      relayMessage = enabled ? event?.message ?? "Ожидание фоновой службы." : ""
+      relayMessage = enabled ? event?.message ?? localized("Waiting for the background service.") : ""
       if phase == "passing", let r = event?.report { route = r }
       if enabled, Tools.supportsInstalledFilter(system.installedDigest), browserRules,
         let p = system.policy
@@ -333,33 +344,33 @@ enum Page: String, CaseIterable, Identifiable {
     }
   }
   var status: String {
-    if !inspected { return "Проверяем настройки" }
+    if !inspected { return localized("Checking settings") }
     if system.installed, !Tools.supportsInstalledFilter(system.installedDigest) {
-      return "Установлена прежняя версия фильтра"
+      return localized("An older filter is installed")
     }
     if phase == "passing" {
-      return issuesForApps.isEmpty ? "Передача открыта" : "Некоторые приложения ожидают запуска"
+      return issuesForApps.isEmpty ? localized("Forwarding active") : localized("Some apps are waiting to start")
     }
-    if phase == "checking" { return "Проверяем маршрут" }
-    if system.legacyFilter { return "Требуется применить фильтр" }
-    if system.needsAdmin { return "Установка требует внимания" }
-    if system.installed && !system.filter { return "Системная служба недоступна" }
+    if phase == "checking" { return localized("Checking route") }
+    if system.legacyFilter { return localized("Apply the filter") }
+    if system.needsAdmin { return localized("Installation needs attention") }
+    if system.installed && !system.filter { return localized("System service unavailable") }
     if system.installed {
-      return phase == "blocked" || !active ? "Передача закрыта" : "Ожидание проверки"
+      return phase == "blocked" || !active ? localized("Forwarding blocked") : localized("Waiting for verification")
     }
-    return "Правила не установлены"
+    return localized("Rules aren’t installed")
   }
   var menuShield: (symbol: String, title: String, detail: String?) {
-    if busy || !inspected { return ("shield", "Проверяем настройки", nil) }
+    if busy || !inspected { return ("shield", localized("Checking settings"), nil) }
     if !active {
-      return ("shield.slash", "Передача выключена", system.installed ? nil : "Правила не установлены")
+      return ("shield.slash", localized("Forwarding off"), system.installed ? nil : localized("Rules aren’t installed"))
     }
     if phase == "checking" { return ("shield", status, nil) }
     if phase == "passing", system.installed, Tools.supportsInstalledFilter(system.installedDigest) {
       if issuesForApps.isEmpty { return ("checkmark.shield.fill", status, nil) }
       return ("exclamationmark.shield", status, issuesForApps.joined(separator: ", "))
     }
-    return ("xmark.shield", "Маршрут не подтверждён", issues.first?.detail ?? relayMessage)
+    return ("xmark.shield", localized("Route unverified"), issues.first?.detail ?? relayMessage)
   }
   var updateNeeded: Bool {
     guard draftLoaded else { return false }
@@ -404,16 +415,16 @@ enum Page: String, CaseIterable, Identifiable {
     if settings.host.isEmpty {
       items.append(
         .init(
-          title: "Укажите прокси", detail: "Введите адрес и данные подключения.", page: .connection)
+          title: localized("Set up your proxy"), detail: localized("Enter the proxy address and connection details."), page: .connection)
       )
     } else if !probeFailed.isEmpty {
       items.append(
-        .init(title: "Прокси не прошёл проверку", detail: probeFailed, page: .connection))
+        .init(title: localized("Proxy check failed"), detail: probeFailed, page: .connection))
     }
     if !inspected {
       items.append(
         .init(
-          title: "Проверяем настройки Mac", detail: "Читаем состояние системной службы.",
+          title: localized("Checking Mac settings"), detail: localized("Reading the system service status."),
           page: .filter))
       return items
     }
@@ -422,51 +433,50 @@ enum Page: String, CaseIterable, Identifiable {
     {
       items.append(
         .init(
-          title: system.installed ? "Обновите системный фильтр" : "Установите фильтр",
-          detail: "Откройте фильтр и обновите профиль.", page: .filter))
+          title: system.installed ? localized("Update the system filter") : localized("Install the filter"),
+          detail: localized("Open Filter and update the profile."), page: .filter))
     } else if !(system.rulesReady ?? system.files) || !system.filter || !system.dns {
       let missing = [
-        !system.filter ? "системная служба" : nil, !(system.rulesReady ?? system.files) ? "файлы правил" : nil,
-        !system.dns ? "локальный DNS" : nil,
+        !system.filter ? localized("system service") : nil, !(system.rulesReady ?? system.files) ? localized("rule files") : nil,
+        !system.dns ? localized("local DNS") : nil,
       ].compactMap { $0 }.joined(separator: ", ")
       items.append(
-        .init(title: "Маршрут не подтверждён", detail: "Проверьте: " + missing + ".", page: .filter)
+        .init(title: localized("Route unverified"), detail: localized("Check the following: %@.", missing), page: .filter)
       )
     }
     if system.clockReady == false {
-      items.append(.init(title: "Системный пояс изменился на " + system.zone,
-        detail: "В «Подключении» повторно примените пояс прокси или откатите управление поясом Mac.", page: .connection))
+      items.append(.init(title: localized("The system time zone changed to %@", system.zone),
+        detail: localized("Open Connection to reapply the proxy time zone or restore the Mac’s previous setting."), page: .connection))
     }
     if system.installed && system.policy?.domains.contains(FilterPolicy.diagnosticDomain) != true {
-      items.append(.init(title: "DNS-тест в обычном браузере вне фильтра",
-        detail: "Обновите профиль, чтобы Net.Coffee и его проверочные поддомены шли через прокси.", page: .filter))
+      items.append(.init(title: localized("Browser DNS test is outside the filter"),
+        detail: localized("Update the profile to route Net.Coffee and its test subdomains through the proxy."), page: .filter))
     }
     if profileReport.condition != .current {
       items.append(
         .init(
           title: profileReport.detail,
           detail: profileReport.condition == .pending
-            ? "Перезапустите указанные приложения. В фильтре можно перечитать профиль."
-            : "В разделе «Фильтр» откройте установку профиля.", page: .filter))
+            ? localized("Restart the listed apps. You can reload their settings in Filter.")
+            : localized("Open Filter to install the profile."), page: .filter))
     }
     if !issuesForApps.isEmpty {
       items.append(
         .init(
-          title: "Приложения ожидают часовой пояс",
+          title: localized("Apps are waiting for the time zone"),
           detail:
-            "Завершите сохранение документов и подтвердите обычный выход, если приложение запросило его. "
-            + issuesForApps.joined(separator: ", "), page: .filter))
+            localized("Save your documents and confirm if an app asks to quit. %@", issuesForApps.joined(separator: ", ")), page: .filter))
     }
     if system.installed && !active {
       items.append(
         .init(
-          title: "Фоновая передача выключена",
-          detail: "После настройки включите передачу на этом экране.", page: .overview))
+          title: localized("Background forwarding is off"),
+          detail: localized("Once setup is complete, turn on forwarding here."), page: .overview))
     } else if active && phase != "passing" && items.isEmpty {
       items.append(
         .init(
-          title: phase == "checking" ? "Проверяем выход прокси" : "Передача ожидает проверки",
-          detail: relayMessage.isEmpty ? "Ожидаем результат проверки прокси." : relayMessage,
+          title: phase == "checking" ? localized("Checking the proxy exit") : localized("Forwarding is waiting for verification"),
+          detail: relayMessage.isEmpty ? localized("Waiting for the proxy check.") : relayMessage,
           page: .connection))
     }
     return items
@@ -476,13 +486,13 @@ enum Page: String, CaseIterable, Identifiable {
     let (verified, dns) = try await Task.detached {
       let data = try Tools.run(Tools.engine, ["probe"], input: JSONEncoder().encode(config))
       guard let report = try JSONDecoder().decode(Event.self, from: data).report else {
-        throw GuardError.message("Не удалось подтвердить выход прокси.")
+        throw GuardError.message(localized("Couldn’t verify the proxy exit."))
       }
       let observations = checkDNS ? try config.observedDNS(requireBerlin: config.dnsMode == "berlin") : []
       return (report, observations)
     }.value
     guard config == settings else {
-      throw GuardError.message("Параметры прокси изменились, повторите проверку.")
+      throw GuardError.message(localized("Proxy settings changed. Run the check again."))
     }
     if checkDNS { dnsObservations = dns }
     let previous = try Vault.read()
@@ -500,7 +510,7 @@ enum Page: String, CaseIterable, Identifiable {
     isTestingProxy = true
     route = nil
     dnsObservations = []
-    notice = "Проверяем IP выхода и DNS через прокси…"
+    notice = localized("Checking the exit IP and DNS through the proxy…")
     Task {
       defer {
         isTestingProxy = false
@@ -508,7 +518,7 @@ enum Page: String, CaseIterable, Identifiable {
       }
       do {
         _ = try await checkedRoute(checkDNS: true)
-        notice = "IP выхода и DNS проверены."
+        notice = localized("Exit IP and DNS verified.")
       } catch {
         probeFailed = error.localizedDescription
         notice = probeFailed
@@ -523,7 +533,7 @@ enum Page: String, CaseIterable, Identifiable {
       return
     }
     busy = true
-    notice = "Готовим профиль…"
+    notice = localized("Preparing the profile…")
     Task {
       defer {
         busy = false
@@ -546,7 +556,7 @@ enum Page: String, CaseIterable, Identifiable {
           try JSONDecoder().decode(SystemState.self, from: Tools.run(Tools.engine, ["system"]))
         }.value
         guard state.installed, state.policy == desired, state.filter, state.rulesReady ?? state.files else {
-          throw GuardError.message("macOS ещё не подтвердила системные правила.")
+          throw GuardError.message(localized("macOS hasn’t confirmed the system rules yet."))
         }
         system = state
         let report = await Task.detached { Profile.report(desired) }.value
@@ -555,11 +565,11 @@ enum Page: String, CaseIterable, Identifiable {
         active = true
         if report.condition == .current {
           try Profile.openSettings()
-          notice = "Фильтр обновлён. Профиль подтверждён."
+          notice = localized("Filter updated and profile verified.")
         } else {
           try Profile.open(desired)
           notice =
-            "Подтвердите установку в «Управлении устройством». Фильтр включится автоматически."
+            localized("Confirm installation in Device Management. The filter will start automatically.")
         }
       } catch { notice = error.localizedDescription }
     }
@@ -575,7 +585,7 @@ enum Page: String, CaseIterable, Identifiable {
       do {
         let r = try await checkedRoute()
         try await Task.detached { try Tools.admin(["set-zone", String(getuid()), r.zone]) }.value
-        notice = "На Mac установлен часовой пояс " + r.zone + "."
+        notice = localized("Mac time zone set to %@.", r.zone)
       } catch { notice = error.localizedDescription }
     }
   }
@@ -600,7 +610,7 @@ enum Page: String, CaseIterable, Identifiable {
         }
         guard ZoneLaunch.ready(app.id, system.proxyZone) else {
           throw GuardError.message(
-            "Пояс браузера ещё не подтверждён. Завершите приложение и повторите проверку.")
+            localized("The browser time zone hasn’t been verified. Quit the app and run the check again."))
         }
         _ = try await NSWorkspace.shared.open(
           [URL(string: "https://ip.net.coffee/claude/")!], withApplicationAt: url,
@@ -618,7 +628,7 @@ enum Page: String, CaseIterable, Identifiable {
           try JSONDecoder().decode(SystemState.self, from: Tools.run(Tools.engine, ["system"]))
         }.value
         system = status
-        notice = "Текущий часовой пояс Mac — " + status.zone + "."
+        notice = localized("Current Mac time zone: %@.", status.zone)
       } catch { notice = error.localizedDescription }
       busy = false
       refresh()
@@ -635,7 +645,7 @@ enum Page: String, CaseIterable, Identifiable {
       do {
         try await Task.detached { try Tools.admin(["refresh-preferences", String(getuid())]) }.value
         notice =
-          "Настройки macOS перечитаны. Полностью перезапустите приложения, указанные в статусе профиля."
+          localized("macOS settings reloaded. Quit and reopen the apps listed in the profile status.")
       } catch { notice = error.localizedDescription }
     }
   }
@@ -650,7 +660,7 @@ enum Page: String, CaseIterable, Identifiable {
           try await Task.detached { try Tools.admin(["rollback-filter"]) }.value
         }
         try await Task.detached { try Profile.remove() }.value
-        notice = "Откат завершён. Перезапустите выбранные приложения."
+        notice = localized("Rollback complete. Restart the selected apps.")
       } catch { notice = error.localizedDescription }
       busy = false
       refresh()

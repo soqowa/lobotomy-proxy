@@ -61,7 +61,7 @@ struct FilterPolicy: Codable, Equatable {
   func normalized() throws -> Self {
     let input = try json()
     guard input.count <= 48 * 1024 else {
-      throw GuardError.message("Список правил слишком длинный.")
+      throw GuardError.message(localized("The rule list is too long."))
     }
     let data = try Tools.run(Tools.engine, ["normalize"], input: input)
     return try JSONDecoder().decode(Self.self, from: data)
@@ -158,15 +158,15 @@ enum Profile {
       let uuid = NSUUID(uuidBytes: bytes).uuidString
       return [
         "PayloadType": "com.apple.ManagedClient.preferences", "PayloadIdentifier": identifier,
-        "PayloadUUID": uuid, "PayloadVersion": 1, "PayloadDisplayName": "Правила приложения",
+        "PayloadUUID": uuid, "PayloadVersion": 1, "PayloadDisplayName": localized("Application rules"),
         "PayloadContent": [domain: ["Forced": [["mcx_preference_settings": prefs[domain]!]]]],
       ]
     }
     let profile: [String: Any] = [
       "PayloadType": "Configuration", "PayloadIdentifier": id,
       "PayloadUUID": "ED74DD1A-0599-595D-AE6C-AD206E96B626", "PayloadVersion": 1,
-      "PayloadScope": "User", "PayloadDisplayName": "Lobotomy Proxy · Фильтр",
-      "PayloadDescription": "Маршрутизация по выбранным доменам и приложениям.",
+      "PayloadScope": "User", "PayloadDisplayName": localized("Lobotomy Proxy · Filter"),
+      "PayloadDescription": localized("Route traffic for selected domains and applications."),
       "PayloadContent": payloads,
     ]
     return try PropertyListSerialization.data(fromPropertyList: profile, format: .xml, options: 0)
@@ -178,7 +178,7 @@ enum Profile {
       "Filter-" + (try signature(policy).prefix(16)) + ".mobileconfig")
     try data(policy).write(to: path, options: .atomic)
     guard NSWorkspace.shared.open(path) else {
-      throw GuardError.message("Не удалось открыть профиль.")
+      throw GuardError.message(localized("Couldn’t open the profile."))
     }
     try openSettings()
   }
@@ -188,7 +188,7 @@ enum Profile {
         URL(string: "x-apple.systempreferences:com.apple.Profiles-Settings.extension")!)
     else {
       throw GuardError.message(
-        "Профиль загружен. Откройте Настройки системы → Основные → Управление устройством.")
+        localized("Profile downloaded. Open System Settings → General → Device Management."))
     }
   }
   static func remove() throws {

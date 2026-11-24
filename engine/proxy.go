@@ -54,22 +54,22 @@ func canonical(s string) string { return strings.TrimSuffix(strings.ToLower(s), 
 func protected(s string) bool   { return matches(activePolicy.Domains, s) }
 func (c Config) validate() error {
 	if c.DNSMode != "" && c.DNSMode != "upstream" && c.DNSMode != "berlin" {
-		return errors.New("неизвестный режим DNS")
+		return errors.New(message("unknown DNS mode"))
 	}
 	if c.DNSMode == "berlin" && net.ParseIP(c.Address) == nil && net.ParseIP(c.Host) == nil {
-		return errors.New("Для берлинского DNS укажите числовой IP подключения к прокси.")
+		return errors.New(message("Enter the proxy’s numeric IP address to use Berlin DNS."))
 	}
 	if c.Kind != "http" && c.Kind != "https" && c.Kind != "socks5" {
-		return errors.New("неизвестный тип прокси")
+		return errors.New(message("unknown proxy type"))
 	}
 	if !validName(canonical(c.Host)) && net.ParseIP(c.Host) == nil {
-		return errors.New("некорректное имя сервера")
+		return errors.New(message("invalid server name"))
 	}
 	if c.Address != "" && net.ParseIP(c.Address) == nil {
-		return errors.New("IP сервера должен быть числовым")
+		return errors.New(message("the server IP must be numeric"))
 	}
 	if c.Port < 1 || c.Port > 65535 || strings.ContainsAny(c.User, "\r\n:") || len(c.User) > 255 || len(c.Password) > 255 || (c.User == "") != (c.Password == "") {
-		return errors.New("проверьте порт, логин и пароль")
+		return errors.New(message("check the port, username, and password"))
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func (c Config) upstream(ctx context.Context, host string, port int) (net.Conn, 
 		return nil, err
 	}
 	if (!validName(host) && net.ParseIP(host) == nil) || port < 1 || port > 65535 {
-		return nil, errors.New("неверный адрес назначения")
+		return nil, errors.New(message("invalid destination address"))
 	}
 	address := c.Address
 	if address == "" {
@@ -93,7 +93,7 @@ func (c Config) upstream(ctx context.Context, host string, port int) (net.Conn, 
 	}
 	raw, err := (&net.Dialer{Timeout: 6 * time.Second}).DialContext(ctx, "tcp", net.JoinHostPort(address, strconv.Itoa(c.Port)))
 	if err != nil {
-		return nil, errors.New("нет соединения с прокси")
+		return nil, errors.New(message("could not connect to the proxy"))
 	}
 	success := false
 	defer func() {
@@ -106,7 +106,7 @@ func (c Config) upstream(ctx context.Context, host string, port int) (net.Conn, 
 	if c.Kind == "https" {
 		t := tls.Client(raw, &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12})
 		if err = t.HandshakeContext(ctx); err != nil {
-			return nil, errors.New("ошибка TLS до прокси")
+			return nil, errors.New(message("TLS connection to the proxy failed"))
 		}
 		conn = t
 	}
@@ -125,7 +125,7 @@ func (c Config) upstream(ctx context.Context, host string, port int) (net.Conn, 
 			var resp *http.Response
 			resp, err = http.ReadResponse(br, &http.Request{Method: "CONNECT"})
 			if err == nil && resp.StatusCode != 200 {
-				err = fmt.Errorf("прокси ответил HTTP %d", resp.StatusCode)
+				err = fmt.Errorf(message("proxy returned HTTP %d"), resp.StatusCode)
 			}
 			limited.N = 1 << 62
 			conn = buffered{conn, br}
@@ -151,7 +151,7 @@ func (c Config) socks(n net.Conn, host string, port int) error {
 		return err
 	}
 	if pair != [2]byte{5, method} {
-		return errors.New("SOCKS5 отклонил метод авторизации")
+		return errors.New(message("SOCKS5 rejected the authentication method"))
 	}
 	if method == 2 {
 		msg := append([]byte{1, byte(len(c.User))}, c.User...)
@@ -164,7 +164,7 @@ func (c Config) socks(n net.Conn, host string, port int) error {
 			return err
 		}
 		if pair != [2]byte{1, 0} {
-			return errors.New("SOCKS5 отклонил логин или пароль")
+			return errors.New(message("SOCKS5 rejected the username or password"))
 		}
 	}
 	msg := []byte{5, 1, 0}
@@ -189,7 +189,7 @@ func (c Config) socks(n net.Conn, host string, port int) error {
 		return err
 	}
 	if h[0] != 5 || h[1] != 0 || h[2] != 0 {
-		return errors.New("SOCKS5 отклонил соединение")
+		return errors.New(message("SOCKS5 rejected the connection"))
 	}
 	var size int
 	switch h[3] {
@@ -204,7 +204,7 @@ func (c Config) socks(n net.Conn, host string, port int) error {
 		}
 		size = int(l[0])
 	default:
-		return errors.New("некорректный ответ SOCKS5")
+		return errors.New(message("invalid SOCKS5 response"))
 	}
 	_, err := io.CopyN(io.Discard, n, int64(size+2))
 	return err
@@ -218,7 +218,7 @@ func (c Config) get(ctx context.Context, host, path string) ([]byte, error) {
 	n.SetDeadline(time.Now().Add(10 * time.Second))
 	t := tls.Client(n, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
 	if err = t.HandshakeContext(ctx); err != nil {
-		return nil, errors.New("ошибка проверки TLS диагностического сервиса")
+		return nil, errors.New(message("TLS verification of the diagnostic service failed"))
 	}
 	req, _ := http.NewRequest("GET", "https://"+host+path, nil)
 	req.Close = true
@@ -231,7 +231,7 @@ func (c Config) get(ctx context.Context, host, path string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("диагностика %s вернула HTTP %d", host, resp.StatusCode)
+		return nil, fmt.Errorf(message("diagnostic service %s returned HTTP %d"), host, resp.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 32768))
 }
@@ -244,11 +244,11 @@ func probe(c Config) (Report, error) {
 	}
 	var r struct{ IP, Country, Timezone string }
 	if json.Unmarshal(b, &r) != nil || r.Timezone == "" || !safeZone(r.Timezone) || len(r.Country) != 2 {
-		return Report{}, errors.New("не удалось определить часовой пояс выхода")
+		return Report{}, errors.New(message("could not determine the exit time zone"))
 	}
 	ip, err := netip.ParseAddr(r.IP)
 	if err != nil {
-		return Report{}, errors.New("неверный внешний IP")
+		return Report{}, errors.New(message("invalid public IP"))
 	}
 	b, err = c.get(ctx, "www.cloudflare.com", "/cdn-cgi/trace")
 	if err != nil {
@@ -263,7 +263,7 @@ func probe(c Config) (Report, error) {
 	}
 	cross, err := netip.ParseAddr(trace["ip"])
 	if err != nil || ip.Unmap() != cross.Unmap() || trace["loc"] != r.Country {
-		return Report{}, errors.New("диагностические сервисы видят разные выходы")
+		return Report{}, errors.New(message("diagnostic services reported different exits"))
 	}
 	return Report{ip.String(), r.Country, r.Timezone}, nil
 }

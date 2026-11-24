@@ -57,13 +57,13 @@ struct FilterView: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
       HStack {
-        Text("Фильтр").font(.largeTitle.bold())
+        Text(localized("Filter")).font(.largeTitle.bold())
         Spacer()
-        Button("Обновить профиль…") { guide = true }.buttonStyle(.borderedProminent).disabled(
+        Button(localized("Update Profile…")) { guide = true }.buttonStyle(.borderedProminent).disabled(
           c.busy || !c.updateNeeded)
       }
       Surface {
-        Text("Домены").font(.headline)
+        Text(localized("Domains")).font(.headline)
         HStack(spacing: 7) {
           ForEach(FilterCatalog.shared.presets) { p in
             let on = c.selection.sources[p.id] != nil
@@ -73,10 +73,10 @@ struct FilterView: View {
           }
         }
         HStack {
-          TextField("Добавить домен или несколько через запятую", text: $entry).textFieldStyle(
+          TextField(localized("Add a domain or enter several separated by commas"), text: $entry).textFieldStyle(
             .roundedBorder
           ).onSubmit { add() }
-          Button("Добавить") { add() }.disabled(FilterPolicy.words(entry).isEmpty)
+          Button(localized("Add")) { add() }.disabled(FilterPolicy.words(entry).isEmpty)
         }
         if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
         if !c.draft.domains.isEmpty {
@@ -88,7 +88,7 @@ struct FilterView: View {
                   edit { $0.remove(d) }
                 } label: {
                   Image(systemName: "xmark").font(.system(size: 9, weight: .semibold))
-                }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel("Убрать " + d)
+                }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel(localized("Remove %@", d))
               }
               .padding(.horizontal, 9).padding(.vertical, 5).background(
                 .quaternary.opacity(0.6), in: Capsule())
@@ -99,7 +99,7 @@ struct FilterView: View {
       }.disabled(!c.draftLoaded || c.busy)
       Surface {
         HStack {
-          Text("Приложения").font(.headline)
+          Text(localized("Applications")).font(.headline)
           Spacer()
           Menu {
             ForEach(FilterCatalog.shared.apps) { a in
@@ -107,13 +107,13 @@ struct FilterView: View {
                 c.draft.applications.contains { $0.id == a.id })
             }
             Divider()
-            Button("Выбрать файл .app…") { c.chooseFilterApp() }
+            Button(localized("Choose an .app file…")) { c.chooseFilterApp() }
           } label: {
-            Label("Добавить", systemImage: "plus")
+            Label(localized("Add"), systemImage: "plus")
           }.fixedSize()
         }
         Text(
-          "Весь поддерживаемый веб-трафик выбранных приложений идёт через прокси. При обычном запуске они получают его часовой пояс."
+          localized("All supported web traffic from selected apps goes through the proxy. They use its time zone when opened normally.")
         ).font(.callout).foregroundStyle(.secondary)
         ForEach(c.draft.applications) { rule in
           if let a = FilterCatalog.shared.apps.first(where: { $0.id == rule.id }) {
@@ -130,26 +130,26 @@ struct FilterView: View {
               } label: {
                 Image(systemName: "minus.circle")
               }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel(
-                "Убрать " + a.name)
+                localized("Remove %@", a.name))
             }.transition(motion.item)
           }
         }
       }.disabled(!c.draftLoaded || c.busy)
       HStack(alignment: .top, spacing: 12) {
         VStack(alignment: .leading, spacing: 5) {
-          Text("Профиль macOS").fontWeight(.medium)
+          Text(localized("macOS profile")).fontWeight(.medium)
           Text(c.profileReport.detail).font(.callout).foregroundStyle(.secondary)
           if c.system.policy != c.draft.systemRules && c.draftLoaded {
-            Text("Изменения сохранены и ожидают обновления профиля.").font(.caption)
+            Text(localized("Changes saved. Update the profile to apply them.")).font(.caption)
               .foregroundStyle(.secondary)
           }
           if c.profileReport.condition == .pending {
-            Button("Перечитать настройки…") { c.refreshManagedPreferences() }.buttonStyle(.link)
+            Button(localized("Reload Settings…")) { c.refreshManagedPreferences() }.buttonStyle(.link)
               .disabled(c.busy)
           }
         }
         Spacer()
-        Button("Откатить профиль…") { rollback = true }.buttonStyle(.link).disabled(
+        Button(localized("Roll Back Profile…")) { rollback = true }.buttonStyle(.link).disabled(
           c.busy || !(c.system.installed || c.profileReport.condition.installed))
       }.padding(.horizontal, 2)
     }
@@ -159,28 +159,28 @@ struct FilterView: View {
       VStack(alignment: .leading, spacing: 18) {
         Image(systemName: "doc.badge.gearshape").font(.title)
           .foregroundStyle(accent)
-        Text("Установка профиля").font(.title.bold())
+        Text(localized("Install profile")).font(.title.bold())
         Text(
-          "В Настройках системы откройте «Основные → Управление устройством», выберите «Lobotomy Proxy · Фильтр» и подтвердите установку или замену."
+          localized("In System Settings, open General → Device Management, select “Lobotomy Proxy · Filter”, and confirm the installation or replacement.")
         )
         Text(
-          "Фильтр включится автоматически после подтверждения. Сохраните документы: открытые приложения из списка могут перезапуститься для применения часового пояса."
+          localized("The filter starts automatically after approval. Save your documents first. Selected apps may restart to apply the time zone.")
         ).font(.callout).foregroundStyle(.secondary)
         HStack {
           Spacer()
-          Button("Отмена") { guide = false }.keyboardShortcut(.cancelAction)
-          Button("Открыть настройки системы") {
+          Button(localized("Cancel")) { guide = false }.keyboardShortcut(.cancelAction)
+          Button(localized("Open System Settings")) {
             guide = false
             c.updateProfile()
           }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
         }
       }.padding(28).frame(width: 480)
-    }.alert("Откатить профиль и фильтр?", isPresented: $rollback) {
-      Button("Отмена", role: .cancel) {}
-      Button("Откатить", role: .destructive) { c.rollback() }
+    }.alert(localized("Roll back the profile and filter?"), isPresented: $rollback) {
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Roll Back"), role: .destructive) { c.rollback() }
     } message: {
       Text(
-        "Правила прокси будут удалены. Закройте и снова откройте выбранные приложения для обычного запуска. Системный пояс можно вернуть отдельно в «Подключении»."
+        localized("This removes the proxy rules. Quit and reopen the selected apps to start them normally. You can restore the system time zone separately in Connection.")
       )
     }
   }

@@ -98,7 +98,7 @@ func browser(c net.Conn, workerSocket string) {
 	if len(hdr) == 0 {
 		return
 	}
-	if bytes.HasPrefix(hdr, []byte("GET ")) && diagnostic(c, hdr, "Политика браузера → локальный прокси") {
+	if bytes.HasPrefix(hdr, []byte("GET ")) && diagnostic(c, hdr, "Browser policy → local proxy") {
 		return
 	}
 	line := strings.SplitN(string(hdr), "\r\n", 2)[0]
@@ -140,7 +140,7 @@ func prepareRunDir(uid int) error {
 	}
 	st, e := os.Lstat(dir)
 	if e != nil || !st.IsDir() || st.Mode().Perm() != 0700 {
-		return errors.New("неверная папка канала")
+		return errors.New(message("invalid socket directory"))
 	}
 	return nil
 }
@@ -156,7 +156,7 @@ func dropPrivileges(uid int) error {
 	}
 	gid, e := strconv.Atoi(strings.TrimSpace(string(group)))
 	if e != nil || gid <= 0 {
-		return errors.New("не удалось определить группу пользователя")
+		return errors.New(message("could not determine the user’s group"))
 	}
 	if e = syscall.Setgroups([]int{gid}); e != nil {
 		return e
@@ -172,7 +172,7 @@ func filter() error {
 		return e
 	}
 	if s.Filter == nil {
-		return errors.New("требуется обновление фильтра")
+		return errors.New(message("filter update required"))
 	}
 	activePolicy = *s.Filter
 	activeAliases = s.HostAliases
@@ -337,15 +337,15 @@ func worker(c Config) error {
 	uid := os.Getuid()
 	s, e := loadInstall()
 	if e != nil || !s.Ready || s.UID != uid {
-		return errors.New("правила macOS ещё не установлены")
+		return errors.New(message("macOS rules are not installed yet"))
 	}
 	if s.Filter == nil {
-		return errors.New("примените обновлённый фильтр")
+		return errors.New(message("apply the updated filter"))
 	}
 	activePolicy = *s.Filter
 	activeAliases = s.HostAliases
 	if !live() {
-		return errors.New("системная служба недоступна")
+		return errors.New(message("system service unavailable"))
 	}
 	// Lock the stable directory inode instead of racing another worker's stale socket cleanup.
 	directory, e := os.Open(runDir(uid))
@@ -354,7 +354,7 @@ func worker(c Config) error {
 	}
 	defer directory.Close()
 	if e = syscall.Flock(int(directory.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
-		return errors.New("передача уже запущена в другом окне")
+		return errors.New(message("forwarding is already running in another window"))
 	}
 	_ = os.Remove(socket(uid))
 	l, e := net.Listen("unix", socket(uid))
@@ -398,14 +398,14 @@ func worker(c Config) error {
 			epoch++
 			g.closeAll()
 			next = time.Now().Add(2 * time.Second)
-			show("blocked", "Прокси отклонил соединение. Передача закрыта.", nil)
+			show("blocked", message("The proxy rejected the connection. Forwarding is blocked."), nil)
 		default:
 		}
 		ok := filesOK(s) && live() && systemDNS()
 		if !ok {
 			g.closeAll()
 			epoch++
-			show("blocked", "Передача закрыта. Проверьте службу и доменные правила DNS.", nil)
+			show("blocked", message("Forwarding is blocked. Check the service and domain DNS rules."), nil)
 		}
 		select {
 		case res := <-rc:
@@ -414,10 +414,10 @@ func worker(c Config) error {
 				g.Lock()
 				g.deadline = time.Now().Add(70 * time.Second)
 				g.Unlock()
-				show("passing", "Маршрут фильтра подтверждён", &res.r)
+				show("passing", message("Filter route verified"), &res.r)
 			} else if ok {
 				g.closeAll()
-				msg := "Изменился часовой пояс выхода."
+				msg := message("The exit time zone changed.")
 				if res.e != nil {
 					msg = res.e.Error()
 				}
@@ -430,7 +430,7 @@ func worker(c Config) error {
 		g.Unlock()
 		if expired {
 			g.closeAll()
-			show("blocked", "Истёк результат проверки.", nil)
+			show("blocked", message("The verification result expired."), nil)
 		}
 		if ok && !checking && time.Now().After(next) {
 			checking = true
@@ -492,12 +492,12 @@ func main() {
 			var r Report
 			r, e = probe(c)
 			if e == nil {
-				emit("tested", "Выход подтверждён", &r)
+				emit("tested", message("Exit verified"), &r)
 			}
 		} else {
 			go func() { launchPermissions.read(br); os.Exit(0) }()
 			go launchPermissions.monitor()
-			emit("checking", "Проверка системного маршрута", nil)
+			emit("checking", message("Checking the system route"), nil)
 			e = worker(c)
 		}
 	case "install":
@@ -520,7 +520,7 @@ func main() {
 					e = install(uid, os.Args[3], p)
 				}
 			default:
-				e = errors.New("неверный режим пояса")
+				e = errors.New(message("invalid time zone mode"))
 			}
 		}
 	case "refresh-preferences":
@@ -529,7 +529,7 @@ func main() {
 		}
 		s, err := loadInstall()
 		if os.Geteuid() != 0 || err != nil || s.UID < 501 || strconv.Itoa(s.UID) != os.Args[2] {
-			e = errors.New("не удалось подтвердить владельца системных правил")
+			e = errors.New(message("could not verify ownership of the system rules"))
 		} else {
 			e = command("/usr/bin/mcxrefresh", "-u", os.Args[2])
 		}

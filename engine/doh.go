@@ -20,14 +20,14 @@ import (
 const berlinDoHHost = "berlin.cstorm.is"
 const berlinDoHIP = "37.120.217.76"
 
-var errNoAddress = errors.New("DNS не вернул публичный адрес назначения")
+var errNoAddress = errors.New(message("DNS did not return a public destination address"))
 
 func (c Config) newDNSClient() *http.Client {
 	tr := &http.Transport{
 		ForceAttemptHTTP2: true, IdleConnTimeout: time.Minute,
 		DialContext: func(ctx context.Context, _, address string) (net.Conn, error) {
 			if address != berlinDoHHost+":443" {
-				return nil, errors.New("неожиданный адрес DNS-сервера")
+				return nil, errors.New(message("unexpected DNS server address"))
 			}
 			return c.upstream(ctx, berlinDoHIP, 443)
 		},
@@ -41,13 +41,13 @@ func dnsAddresses(response []byte, q dnsmessage.Question) ([]netip.Addr, error) 
 	if e := m.Unpack(response); e != nil || !m.Response || m.Truncated || m.ID != 0 || m.OpCode != 0 ||
 		len(m.Questions) != 1 || m.Questions[0].Type != q.Type || m.Questions[0].Class != q.Class ||
 		!strings.EqualFold(m.Questions[0].Name.String(), q.Name.String()) {
-		return nil, errors.New("неверный ответ DNS")
+		return nil, errors.New(message("invalid DNS response"))
 	}
 	if m.RCode == dnsmessage.RCodeNameError {
 		return nil, errNoAddress
 	}
 	if m.RCode != dnsmessage.RCodeSuccess {
-		return nil, fmt.Errorf("ошибка DNS: %v", m.RCode)
+		return nil, fmt.Errorf(message("DNS error: %v"), m.RCode)
 	}
 	name := strings.ToLower(q.Name.String())
 	aliases := map[string]string{}
@@ -58,7 +58,7 @@ func dnsAddresses(response []byte, q dnsmessage.Question) ([]netip.Addr, error) 
 	}
 	for steps := 0; aliases[name] != ""; steps++ {
 		if steps >= 16 {
-			return nil, errors.New("слишком длинная цепочка CNAME")
+			return nil, errors.New(message("CNAME chain is too long"))
 		}
 		name = aliases[name]
 	}
@@ -99,16 +99,16 @@ func (c Config) resolve(ctx context.Context, name string, typ dnsmessage.Type) (
 	req.Header.Set("Accept", "application/dns-message")
 	resp, e := c.resolver.Do(req)
 	if e != nil {
-		return nil, fmt.Errorf("берлинский DNS недоступен: %w", e)
+		return nil, fmt.Errorf(message("Berlin DNS is unavailable: %w"), e)
 	}
 	defer resp.Body.Close()
 	mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if resp.StatusCode != 200 || mt != "application/dns-message" {
-		return nil, fmt.Errorf("берлинский DNS вернул HTTP %d (%s)", resp.StatusCode, mt)
+		return nil, fmt.Errorf(message("Berlin DNS returned HTTP %d (%s)"), resp.StatusCode, mt)
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, 65536))
 	if e != nil || len(b) > 65535 {
-		return nil, errors.New("повреждённый ответ DNS")
+		return nil, errors.New(message("malformed DNS response"))
 	}
 	return dnsAddresses(b, q)
 }
@@ -121,7 +121,7 @@ func (c Config) dial(ctx context.Context, host string, port int) (net.Conn, erro
 	}
 	host = canonical(host)
 	if !validName(host) || port < 1 || port > 65535 {
-		return nil, errors.New("неверный адрес назначения")
+		return nil, errors.New(message("invalid destination address"))
 	}
 	if c.resolver == nil {
 		c.resolver = c.newDNSClient()

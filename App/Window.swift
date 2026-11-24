@@ -41,7 +41,7 @@ private struct Sidebar: View {
         } label: {
           HStack(spacing: 11) {
             Image(systemName: item.icon).frame(width: 20).accessibilityHidden(true)
-            Text(item.rawValue).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+            Text(item.title).lineLimit(1).fixedSize(horizontal: true, vertical: false)
             Spacer(minLength: 0)
           }
           .font(.title3)
@@ -172,30 +172,30 @@ struct Dashboard: View {
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 26) {
-      Text("Обзор").font(.largeTitle.bold())
+      Text(localized("Overview")).font(.largeTitle.bold())
       Surface {
         HStack(spacing: 14) {
           ConnectionSignal(state: signal)
           Text(c.status).font(.title2.weight(.semibold))
           Spacer()
           if c.active {
-            Button("Приостановить") { c.stop() }.disabled(c.busy)
+            Button(localized("Pause")) { c.stop() }.disabled(c.busy)
           } else if c.browserRules && c.system.filter && c.system.files && c.system.dns {
-            Button("Включить передачу") { c.start() }.disabled(c.busy)
+            Button(localized("Enable Forwarding")) { c.start() }.disabled(c.busy)
           }
         }
         if let r = c.route {
           Divider()
           HStack(spacing: 24) {
-            metric("Внешний IP", r.ip)
-            metric("Страна", r.country)
-            metric("Пояс выхода", r.zone)
+            metric(localized("Exit IP"), r.ip)
+            metric(localized("Country"), r.country)
+            metric(localized("Exit time zone"), r.zone)
           }
         }
       }
       if !c.issues.isEmpty {
         VStack(alignment: .leading, spacing: 12) {
-          Text("Что требует внимания").font(.headline)
+          Text(localized("Needs attention")).font(.headline)
           Surface {
             ForEach(Array(c.issues.enumerated()), id: \.element.id) { i, issue in
               if i > 0 { Divider() }
@@ -218,20 +218,20 @@ struct Dashboard: View {
       }
       Divider()
       VStack(alignment: .leading, spacing: 9) {
-        Text("Проверка утечек").font(.headline)
+        Text(localized("Leak check")).font(.headline)
         if c.diagnosticsBrowsers.isEmpty {
           if c.defaultManagedBrowser != nil {
-            Button("Проверить DNS в браузере") { c.openDNSPage() }
+            Button(localized("Check DNS in Browser")) { c.openDNSPage() }
               .disabled(c.busy || c.phase != "passing" || !c.diagnosticRuleInstalled)
           } else {
-            Text("Для проверки в отдельном приложении добавьте поддерживаемый браузер в фильтр.")
+            Text(localized("Add a supported browser to the filter to run the check in that app."))
               .font(.callout).foregroundStyle(.secondary)
           }
         } else if c.diagnosticsBrowsers.count == 1, let browser = c.diagnosticsBrowsers.first {
-          Button("Открыть Net.Coffee в " + browser.name) { c.openDiagnostics(browser) }.disabled(
+          Button(localized("Open Net.Coffee in %@", browser.name)) { c.openDiagnostics(browser) }.disabled(
             c.busy || c.phase != "passing" || !c.browserRules)
         } else {
-          Menu("Открыть Net.Coffee") {
+          Menu(localized("Open Net.Coffee")) {
             ForEach(c.diagnosticsBrowsers) { a in Button(a.name) { c.openDiagnostics(a) } }
           }
           .fixedSize().disabled(c.busy || c.phase != "passing" || !c.browserRules)
@@ -258,72 +258,72 @@ struct Connection: View {
   }
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
-      Text("Подключение").font(.largeTitle.bold())
+      Text(localized("Connection")).font(.largeTitle.bold())
       Surface {
         HStack {
-          Text("Прокси-сервер").font(.headline)
+          Text(localized("Proxy server")).font(.headline)
           Spacer()
-          Picker("Протокол", selection: $c.settings.kind) {
+          Picker(localized("Protocol"), selection: $c.settings.kind) {
             Text("SOCKS5").tag("socks5")
             Text("HTTP").tag("http")
             Text("HTTPS").tag("https")
           }.labelsHidden().pickerStyle(.segmented).frame(width: 210)
         }
         HStack(spacing: 14) {
-          field("Сервер") { TextField("proxy.example.com", text: $c.settings.host) }
-          field("Порт") {
+          field(localized("Server")) { TextField("proxy.example.com", text: $c.settings.host) }
+          field(localized("Port")) {
             TextField("1080", value: $c.settings.port, format: .number.grouping(.never))
           }.frame(width: 86)
         }
         HStack(spacing: 14) {
-          field("Логин") { TextField("Необязательно", text: $c.settings.user) }
-          field("Пароль") { SecureField("Необязательно", text: $c.settings.password) }
+          field(localized("Username")) { TextField(localized("Optional"), text: $c.settings.user) }
+          field(localized("Password")) { SecureField(localized("Optional"), text: $c.settings.password) }
         }
-        Picker("DNS защищённых запросов", selection: Binding(
+        Picker(localized("DNS for protected requests"), selection: Binding(
           get: { c.settings.dnsMode ?? "upstream" }, set: { c.settings.dnsMode = $0 }
         )) {
-          Text("Резолвер прокси").tag("upstream")
-          Text("Берлин · CryptoStorm").tag("berlin")
+          Text(localized("Proxy resolver")).tag("upstream")
+          Text(localized("Berlin · CryptoStorm")).tag("berlin")
         }
         if !c.dnsObservations.isEmpty {
-          LabeledContent("DNS в Net.Coffee",
+          LabeledContent(localized("DNS reported by Net.Coffee"),
             value: c.dnsObservations.map(\.label).joined(separator: "\n"))
             .font(.callout).textSelection(.enabled)
         }
-        DisclosureGroup("IP прокси для подключения без DNS", isExpanded: $extra) {
-          TextField("Числовой IP сервера", text: $c.settings.address).padding(.top, 6)
+        DisclosureGroup(localized("Connect by IP without a DNS lookup"), isExpanded: $extra) {
+          TextField(localized("Numeric server IP"), text: $c.settings.address).padding(.top, 6)
         }.font(.callout).foregroundStyle(.secondary)
         HStack(spacing: 14) {
-          Button("Проверить и сохранить") { c.test() }.buttonStyle(.borderedProminent).disabled(
+          Button(localized("Test and Save")) { c.test() }.buttonStyle(.borderedProminent).disabled(
             c.busy || c.settings.host.isEmpty)
           ConnectionSignal(state: probeSignal)
         }
       }.textFieldStyle(.roundedBorder)
-      Text("Часовой пояс").font(.title3.weight(.semibold))
+      Text(localized("Time zone")).font(.title3.weight(.semibold))
       Surface {
-        LabeledContent("На Mac", value: c.system.zone).monospacedDigit()
+        LabeledContent(localized("On this Mac"), value: c.system.zone).monospacedDigit()
         LabeledContent(
-          "На выходе прокси",
+          localized("At the proxy exit"),
           value: c.route?.zone
-            ?? (c.system.proxyZone.isEmpty ? "Ещё не проверен" : c.system.proxyZone)
+            ?? (c.system.proxyZone.isEmpty ? localized("Not verified yet") : c.system.proxyZone)
         ).monospacedDigit()
         Divider()
         Text(
-          "Приложения в фильтре получают пояс прокси при запуске. Здесь можно также изменить пояс всего Mac."
+          localized("Filtered apps use the proxy time zone at launch. You can also apply it to your entire Mac.")
         ).font(.callout).foregroundStyle(.secondary)
         HStack {
-          Button("Применить к Mac") { c.applySystemZone() }.disabled(
+          Button(localized("Apply to Mac")) { c.applySystemZone() }.disabled(
             c.busy || c.settings.host.isEmpty)
           Spacer()
-          Button("Откатить пояс…") { restore = true }.buttonStyle(.link).disabled(
+          Button(localized("Restore Time Zone…")) { restore = true }.buttonStyle(.link).disabled(
             c.busy || !(c.system.ownsZone ?? c.system.systemWide))
         }
       }
-    }.alert("Откатить часовой пояс Mac?", isPresented: $restore) {
-      Button("Отмена", role: .cancel) {}
-      Button("Откатить") { c.restoreZone() }
+    }.alert(localized("Restore the Mac’s time zone?"), isPresented: $restore) {
+      Button(localized("Cancel"), role: .cancel) {}
+      Button(localized("Roll Back")) { c.restoreZone() }
     } message: {
-      Text("Приложение вернёт сохранённый пояс, если оно всё ещё управляет настройкой.")
+      Text(localized("The app will restore the saved time zone if it still manages this setting."))
     }
   }
   func field<V: View>(_ label: String, @ViewBuilder _ content: () -> V) -> some View {
@@ -371,7 +371,7 @@ struct MainWindow: View {
                 c.notice = ""
               } label: {
                 Image(systemName: "xmark")
-              }.buttonStyle(.plain).accessibilityLabel("Скрыть сообщение")
+              }.buttonStyle(.plain).accessibilityLabel(localized("Dismiss message"))
             }
           }.padding(.vertical, 10).padding(.horizontal, 22).background(.bar)
         }
@@ -447,6 +447,7 @@ struct MainWindow: View {
         exit(1)
       }
     }
+    AppLanguage.configureInterface()
     LobotomyProxyApp.main()
   }
 }
@@ -456,9 +457,9 @@ private enum AppTheme: String, CaseIterable {
 
   var title: String {
     switch self {
-    case .system: "Системная"
-    case .light: "Светлая"
-    case .dark: "Тёмная"
+    case .system: localized("System")
+    case .light: localized("Light")
+    case .dark: localized("Dark")
     }
   }
 
@@ -489,12 +490,12 @@ struct LobotomyProxyApp: App {
       Text(shield.title)
       if let detail = shield.detail, !detail.isEmpty { Text(detail) }
       Divider()
-      Button("Открыть обзор") {
+      Button(localized("Open Overview")) {
         control.page = .overview
         openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
       }
-      Picker("Тема", selection: $theme) {
+      Picker(localized("Theme"), selection: $theme) {
         ForEach(AppTheme.allCases, id: \.self) { option in
           Text(option.title).tag(option)
         }

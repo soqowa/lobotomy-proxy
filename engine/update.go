@@ -12,7 +12,7 @@ import (
 
 func install(uid int, zone string, desired Policy) error {
 	if uid < 501 || !safeZone(zone) {
-		return errors.New("проверьте пользователя и пояс выхода")
+		return errors.New(message("check the user and the exit time zone"))
 	}
 	if e := desired.validate(); e != nil {
 		return e
@@ -36,16 +36,16 @@ func install(uid int, zone string, desired Policy) error {
 		s = Installation{UID: uid, MadeResolver: absent(resolver), Zone: zone}
 		for _, p := range []string{agent, jobFile, runDir(uid)} {
 			if !absent(p) {
-				return fmt.Errorf("путь уже занят: %s", p)
+				return fmt.Errorf(message("path already in use: %s"), p)
 			}
 		}
 		if presentAlias() {
-			return errors.New("локальный IP уже занят")
+			return errors.New(message("local IP address already in use"))
 		}
 	} else if e != nil {
 		return e
 	} else if s.UID != uid {
-		return errors.New("правила принадлежат другому пользователю")
+		return errors.New(message("another user owns the rules"))
 	}
 	if e = detachClock(&s); e != nil {
 		return e
@@ -62,12 +62,12 @@ func install(uid int, zone string, desired Policy) error {
 	} else {
 		st, e := os.Lstat(resolver)
 		if e != nil || !st.IsDir() {
-			return errors.New("нестандартная папка resolver")
+			return errors.New(message("nonstandard resolver directory"))
 		}
 	}
 	if s.Updating != nil {
 		if s.Filter == nil || s.Digest != digest {
-			return errors.New("завершите откат прерванного обновления")
+			return errors.New(message("finish rolling back the interrupted update"))
 		}
 		if e = finishUpdate(&s, bin); e != nil {
 			return e
@@ -89,7 +89,7 @@ func install(uid int, zone string, desired Policy) error {
 		}
 		spec, e := os.ReadFile(jobFile)
 		if e != nil || string(spec) != oldSpec {
-			return errors.New("описание службы изменено отдельно")
+			return errors.New(message("the service definition was changed externally"))
 		}
 	}
 	oldRules := []string{}
@@ -98,13 +98,13 @@ func install(uid int, zone string, desired Policy) error {
 	}
 	for _, d := range append(slices.Clone(desired.Domains), checkHost) {
 		if !slices.Contains(oldRules, d) && !absent(filepath.Join(resolver, d)) {
-			return fmt.Errorf("уже есть отдельный DNS для %s", d)
+			return fmt.Errorf(message("a separate DNS configuration already exists for %s"), d)
 		}
 	}
 	for _, d := range oldRules {
 		data, e := os.ReadFile(filepath.Join(resolver, d))
 		if e != nil || string(data) != splitRule(d) {
-			return fmt.Errorf("DNS для %s был изменён отдельно", d)
+			return fmt.Errorf(message("the DNS configuration for %s was changed externally"), d)
 		}
 	}
 	// Save both manifests before changing any owned file. A retry can finish either side of an atomic rename.
@@ -134,7 +134,7 @@ func finishUpdate(s *Installation, bin []byte) error {
 		} else {
 			b, e := os.ReadFile(p)
 			if e != nil || string(b) != splitRule(d) {
-				return fmt.Errorf("конфликт DNS для %s", d)
+				return fmt.Errorf(message("DNS conflict for %s"), d)
 			}
 		}
 	}
@@ -154,7 +154,7 @@ func finishUpdate(s *Installation, bin []byte) error {
 	}
 	actual := fmt.Sprintf("%x", sha256.Sum256(oldBin))
 	if e == nil && actual != s.Digest && actual != t.OldDigest {
-		return errors.New("исполняемый файл службы изменён отдельно")
+		return errors.New(message("the service executable was changed externally"))
 	}
 	if actual != s.Digest {
 		if e = atomicFile(agent, bin, 0755); e != nil {
@@ -167,7 +167,7 @@ func finishUpdate(s *Installation, bin []byte) error {
 	}
 	if !bytes.Equal(spec, plist()) {
 		if string(spec) != t.OldPlist {
-			return errors.New("описание службы изменено отдельно")
+			return errors.New(message("the service definition was changed externally"))
 		}
 		if e = atomicFile(jobFile, plist(), 0644); e != nil {
 			return e

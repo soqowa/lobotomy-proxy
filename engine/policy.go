@@ -54,13 +54,13 @@ type Transition struct {
 var activePolicy Policy // set once before starting listeners in this process
 func normalized(in []string) ([]string, error) {
 	if len(in) > 256 {
-		return nil, errors.New("слишком много доменов")
+		return nil, errors.New(message("too many domains"))
 	}
 	out := make([]string, 0, len(in))
 	for _, raw := range in {
 		h := canonical(strings.TrimPrefix(strings.TrimSpace(raw), "*."))
 		if !validName(h) || !strings.Contains(h, ".") || net.ParseIP(h) != nil || h == checkHost || strings.HasSuffix(h, ".localhost") || strings.HasSuffix(h, ".local") || strings.ContainsAny(h, "/\\") {
-			return nil, fmt.Errorf("некорректный домен: %q", raw)
+			return nil, fmt.Errorf(message("invalid domain: %q"), raw)
 		}
 		out = append(out, h)
 	}
@@ -80,7 +80,7 @@ func (p *Policy) validate() error {
 	for i := range p.Applications {
 		r := &p.Applications[i]
 		if seen[r.ID] || !slices.ContainsFunc(catalog.Apps, func(a Application) bool { return a.ID == r.ID }) {
-			return errors.New("неподдерживаемое или повторяющееся приложение")
+			return errors.New(message("unsupported or duplicate app"))
 		}
 		seen[r.ID] = true
 		r.Domains, e = normalized(r.Domains)
@@ -160,7 +160,7 @@ func ownedBlock(b []byte) (string, error) {
 		return "", nil
 	}
 	if a < 0 || z < a || (a > 0 && b[a-1] != '\n') || bytes.Count(b, []byte(prefix)) != 1 || bytes.Count(b, []byte(suffix)) != 1 {
-		return "", errors.New("повреждена секция Lobotomy Proxy в hosts")
+		return "", errors.New(message("the Lobotomy Proxy section in hosts is damaged"))
 	}
 	return string(b[a : z+len(suffix)]), nil
 }
@@ -173,7 +173,7 @@ func legacyPolicy() (Policy, string, error) {
 	}
 	block, e := ownedBlock(b)
 	if e != nil || block == "" {
-		return p, "", errors.New("секция предыдущей установки не найдена")
+		return p, "", errors.New(message("the previous installation’s section was not found"))
 	}
 	names, e := os.ReadDir(resolver)
 	if e != nil {
@@ -198,7 +198,7 @@ func legacyPolicy() (Policy, string, error) {
 		}
 		ip, d, ok := strings.Cut(line, " ")
 		if !ok || ip != localIP || (d != checkHost && !matches(p.Domains, d)) {
-			return p, "", errors.New("посторонние записи в прежней секции hosts")
+			return p, "", errors.New(message("unrecognized entries in the previous hosts section"))
 		}
 	}
 	return p, block, nil
@@ -216,7 +216,7 @@ func replaceHosts(path, old, next string, domains []string) error {
 		return e
 	}
 	if present != old && present != next {
-		return errors.New("секция hosts была изменена отдельно")
+		return errors.New(message("the hosts section was changed externally"))
 	}
 	others := string(b)
 	if present != "" {
@@ -227,7 +227,7 @@ func replaceHosts(path, old, next string, domains []string) error {
 		if len(f) > 1 {
 			for _, h := range f[1:] {
 				if matches(domains, h) || canonical(h) == checkHost && next != "" {
-					return fmt.Errorf("есть внешняя запись hosts для %s", h)
+					return fmt.Errorf(message("an external hosts entry already exists for %s"), h)
 				}
 			}
 		}
@@ -240,7 +240,7 @@ func replaceHosts(path, old, next string, domains []string) error {
 		updated = strings.Replace(string(b), present, next, 1)
 	} else {
 		if len(b) > 0 && b[len(b)-1] != '\n' {
-			return errors.New("проверьте последнюю строку hosts")
+			return errors.New(message("check the last line of the hosts file"))
 		}
 		updated = string(b) + next
 	}

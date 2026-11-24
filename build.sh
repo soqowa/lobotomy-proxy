@@ -14,7 +14,9 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.proxyguard.app</string>
 <key>CFBundleName</key><string>Lobotomy Proxy</string>
 <key>CFBundleDisplayName</key><string>Lobotomy Proxy</string>
-<key>CFBundleVersion</key><string>9</string>
+<key>CFBundleVersion</key><string>10</string>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array><string>en</string><string>ru</string></array>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -23,6 +25,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 plutil -insert CFBundleShortVersionString -string "$(cat VERSION)" "$app/Contents/Info.plist"
+cp -R App/Resources/ru.lproj "$app/Contents/Resources/"
 cp Brand/lobotomy-proxy.svg "$app/Contents/Resources/"
 swiftc App/BrandArtwork.swift App/Icon.swift -o "$temp/icon-maker"
 "$temp/icon-maker" Brand/lobotomy-proxy.svg "$temp/Icon.iconset"
@@ -31,7 +34,7 @@ for arch in arm64 amd64; do
     swarch="$arch"
     if [[ "$arch" = amd64 ]]; then swarch=x86_64; fi
     (cd engine && CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=14.0 CC="clang -arch $swarch" GOARCH="$arch" go build -trimpath -ldflags='-s -w' -o "$temp/core-$arch" .)
-    swiftc -O -parse-as-library -target "$swarch-apple-macos14.0" App/Model.swift App/Window.swift App/BrandArtwork.swift App/ZoneLaunch.swift App/FilterPolicy.swift App/FilterView.swift App/ProfileStatus.swift App/BackgroundRelay.swift App/DomainSelection.swift -o "$temp/ui-$arch"
+    swiftc -O -parse-as-library -target "$swarch-apple-macos14.0" App/Localization.swift App/Model.swift App/Window.swift App/BrandArtwork.swift App/ZoneLaunch.swift App/FilterPolicy.swift App/FilterView.swift App/ProfileStatus.swift App/BackgroundRelay.swift App/DomainSelection.swift -o "$temp/ui-$arch"
 done
 lipo -create "$temp/core-arm64" "$temp/core-amd64" -output "$app/Contents/Helpers/lobotomy-proxy"
 lipo -create "$temp/ui-arm64" "$temp/ui-amd64" -output "$app/Contents/MacOS/LobotomyProxy"
@@ -48,7 +51,7 @@ cat > "$relay/Contents/Info.plist" <<'RELAY'
 <key>CFBundleIdentifier</key><string>local.proxyguard.relay-agent</string>
 <key>CFBundleName</key><string>Lobotomy Proxy Relay</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>9</string>
+<key>CFBundleVersion</key><string>10</string>
 <key>LSBackgroundOnly</key><true/>
 </dict></plist>
 RELAY

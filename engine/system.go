@@ -103,7 +103,7 @@ func applyTimeZone(s *Installation, target string, systemWide bool, current stri
 		return nil
 	}
 	if !safeZone(current) || !safeZone(target) {
-		return errors.New("не удалось проверить часовой пояс")
+		return errors.New(message("could not verify the time zone"))
 	}
 	if systemWide {
 		s.rememberLegacyZone()
@@ -168,7 +168,7 @@ func readableDirectory(path string) error {
 	}
 	st, ok := info.Sys().(*syscall.Stat_t)
 	if !info.IsDir() || !ok || st.Uid != 0 || info.Mode().Perm()&0022 != 0 {
-		return fmt.Errorf("некорректный владелец или права папки %s", path)
+		return fmt.Errorf(message("invalid owner or permissions on directory %s"), path)
 	}
 	if info.Mode().Perm() == 0755 {
 		return nil
@@ -177,7 +177,7 @@ func readableDirectory(path string) error {
 }
 func exclusive() (*os.File, error) {
 	if os.Geteuid() != 0 {
-		return nil, errors.New("требуются права администратора")
+		return nil, errors.New(message("administrator privileges are required"))
 	}
 	if e := os.MkdirAll(stateDir, 0755); e != nil {
 		return nil, e
@@ -191,7 +191,7 @@ func exclusive() (*os.File, error) {
 	}
 	if e = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); e != nil {
 		f.Close()
-		return nil, errors.New("установка уже выполняется")
+		return nil, errors.New(message("installation is already in progress"))
 	}
 	return f, nil
 }
@@ -201,7 +201,7 @@ func regular(path string) error {
 		return e
 	}
 	if !s.Mode().IsRegular() {
-		return fmt.Errorf("необычный тип файла %s", path)
+		return fmt.Errorf(message("unexpected file type at %s"), path)
 	}
 	return nil
 }
@@ -222,7 +222,7 @@ func removeOwned(path string, want []byte) error {
 		return e
 	}
 	if !bytes.Equal(b, want) {
-		return fmt.Errorf("файл изменён отдельно, сохранён: %s", path)
+		return fmt.Errorf(message("file changed externally and was preserved: %s"), path)
 	}
 	return os.Remove(path)
 }
@@ -234,15 +234,15 @@ func activateInstall(s Installation, zone string) error {
 	}
 	s.rememberLegacyZone()
 	if !rulesOnDisk() {
-		return errors.New("файлы доменных правил изменились. Проверьте конфликт перед откатом")
+		return errors.New(message("domain rule files changed; check the conflict before rolling back"))
 	}
 	bin, e := os.ReadFile(agent)
 	if e != nil || fmt.Sprintf("%x", sha256.Sum256(bin)) != s.Digest {
-		return errors.New("установленный обработчик не прошёл проверку")
+		return errors.New(message("installed worker failed verification"))
 	}
 	spec, e := os.ReadFile(jobFile)
 	if e != nil || !bytes.Equal(spec, plist()) {
-		return errors.New("настройка службы изменена отдельно")
+		return errors.New(message("the service configuration was changed externally"))
 	}
 	s.Alias = true
 	s.Ready = false
@@ -252,7 +252,7 @@ func activateInstall(s Installation, zone string) error {
 	flushDNS()
 	if command("/bin/launchctl", "print", "system/"+job) != nil {
 		if e = command("/bin/launchctl", "bootstrap", "system", jobFile); e != nil {
-			return errors.Join(e, errors.New("доменные правила сохранены, передача закрыта"))
+			return errors.Join(e, errors.New(message("domain rules were preserved and forwarding is blocked")))
 		}
 	} else if !live() {
 		if e = command("/bin/launchctl", "kickstart", "-k", "system/"+job); e != nil {
@@ -263,7 +263,7 @@ func activateInstall(s Installation, zone string) error {
 		time.Sleep(150 * time.Millisecond)
 	}
 	if !live() {
-		return errors.New("служба не смогла занять локальные порты")
+		return errors.New(message("the service could not bind the local ports"))
 	}
 
 	s.Ready = true
@@ -342,7 +342,7 @@ func uninstallLocked(s Installation) error {
 		if slices.Contains(acceptedDigests, fmt.Sprintf("%x", sha256.Sum256(b))) {
 			errs = append(errs, os.Remove(agent))
 		} else {
-			errs = append(errs, errors.New("исполняемый файл службы изменён отдельно"))
+			errs = append(errs, errors.New(message("the service executable was changed externally")))
 		}
 	} else if !os.IsNotExist(e) {
 		errs = append(errs, e)
@@ -356,7 +356,7 @@ func uninstallLocked(s Installation) error {
 			errs = append(errs, os.Remove(socket(s.UID)))
 		}
 		if e := os.Remove(runDir(s.UID)); e != nil {
-			errs = append(errs, errors.New("в рабочей папке остались файлы; они сохранены"))
+			errs = append(errs, errors.New(message("remaining files in the working directory were preserved")))
 		}
 	}
 	flushDNS()

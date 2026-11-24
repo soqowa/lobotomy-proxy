@@ -15,15 +15,15 @@ import (
 const checkHost = "route.proxyguard.test"
 
 // No third-party assets and no JavaScript network access. The browser's time zone stays on the page.
-var checkPage = template.Must(template.New("check").Parse(`<!doctype html>
-<html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Проверка браузера · Lobotomy Proxy</title>
+var checkPage = template.Must(template.New("check").Funcs(template.FuncMap{"label": translated}).Parse(`<!doctype html>
+<html lang="{{.Language}}"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{label .Language "Browser check"}} · Lobotomy Proxy</title>
 <style>:root{color-scheme:light dark}body{font:16px/1.5 -apple-system,system-ui,sans-serif;max-width:36rem;margin:12vh auto;padding:0 24px}h1{font-size:30px}dt{color:#777;margin-top:18px}dd{font-weight:600;margin:3px 0}small{display:block;margin-top:28px}</style>
-<h1>Проверка браузера</h1><dl><dt>Маршрут этого запроса</dt><dd>{{.Route}}</dd>
-<dt>Часовой пояс выхода при установке</dt><dd id="expected">{{.Zone}}</dd>
-<dt>Часовой пояс, который передаёт браузер</dt><dd id="observed">JavaScript выключен</dd></dl>
-<p id="result"></p><small>Страница загружена с этого Mac. Проверка относится к этому окну и этому адресу.</small>
-<script>const z=Intl.DateTimeFormat().resolvedOptions().timeZone;document.getElementById('observed').textContent=z;document.getElementById('result').textContent=z===document.getElementById('expected').textContent?'Часовые пояса совпадают.':'Часовые пояса различаются.';</script></html>`))
+<h1>{{label .Language "Browser check"}}</h1><dl><dt>{{label .Language "Route for this request"}}</dt><dd>{{label .Language .Route}}</dd>
+<dt>{{label .Language "Exit time zone at setup"}}</dt><dd id="expected">{{.Zone}}</dd>
+<dt>{{label .Language "Time zone reported by this browser"}}</dt><dd id="observed">{{label .Language "JavaScript is disabled"}}</dd></dl>
+<p id="result"></p><small>{{label .Language "This page was served by your Mac. The result applies to this window and address."}}</small>
+<script>const z=Intl.DateTimeFormat().resolvedOptions().timeZone;document.getElementById('observed').textContent=z;document.getElementById('result').textContent=z===document.getElementById('expected').textContent?{{label .Language "The time zones match."}}:{{label .Language "The time zones differ."}};</script></html>`))
 
 func diagnostic(c net.Conn, raw []byte, route string) bool {
 	req, e := http.ReadRequest(bufio.NewReader(bytes.NewReader(raw)))
@@ -38,7 +38,7 @@ func diagnostic(c net.Conn, raw []byte, route string) bool {
 		return false
 	}
 	var html bytes.Buffer
-	_ = checkPage.Execute(&html, struct{ Route, Zone string }{route, s.Zone})
+	_ = checkPage.Execute(&html, struct{ Route, Zone, Language string }{route, s.Zone, browserLanguage(req.Header.Get("Accept-Language"))})
 	fmt.Fprintf(c, "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'\r\nCache-Control: no-store\r\nReferrer-Policy: no-referrer\r\nConnection: close\r\nContent-Length: %d\r\n\r\n", html.Len())
 	_, _ = c.Write(html.Bytes())
 	return true
@@ -59,5 +59,5 @@ func header(c net.Conn) []byte {
 }
 func localCheck(c net.Conn) {
 	c.SetDeadline(time.Now().Add(4 * time.Second))
-	diagnostic(c, header(c), "Системный DNS → локальная служба")
+	diagnostic(c, header(c), "System DNS → local service")
 }

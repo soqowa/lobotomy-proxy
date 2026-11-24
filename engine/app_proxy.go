@@ -26,7 +26,7 @@ func parseDestination(line string) (string, string, int) {
 }
 func workerDial(path, scope, host string, port int) (net.Conn, error) {
 	if strings.ContainsAny(scope+host, " \t\r\n") {
-		return nil, errors.New("неверный адрес")
+		return nil, errors.New(message("invalid address"))
 	}
 	n, e := net.DialTimeout("unix", path, time.Second)
 	if e != nil {
@@ -38,7 +38,7 @@ func workerDial(path, scope, host string, port int) (net.Conn, error) {
 		var result string
 		result, e = limitedLines(n)
 		if e == nil && result != "OK" {
-			e = errors.New("передача закрыта")
+			e = errors.New(message("forwarding is blocked"))
 		}
 	}
 	if e != nil {
@@ -63,7 +63,7 @@ func (p applicationProxy) dial(_ context.Context, _, addr string) (net.Conn, err
 	host = canonical(host)
 	n, e := strconv.Atoi(port)
 	if e != nil || !p.policy.allows(p.scope, host, n) {
-		return nil, errors.New("адрес закрыт правилом")
+		return nil, errors.New(message("address blocked by a rule"))
 	}
 	return workerDial(p.path, p.scope, host, n)
 }
@@ -98,7 +98,7 @@ func (p applicationProxy) handler() http.Handler {
 			if e == nil {
 				defer c.Close()
 				c.SetDeadline(time.Now().Add(3 * time.Second))
-				diagnostic(c, []byte("GET /check HTTP/1.1\r\nHost: "+checkHost+":17688\r\n\r\n"), "Профиль приложения → локальный прокси")
+				diagnostic(c, []byte("GET /check HTTP/1.1\r\nHost: "+checkHost+":17688\r\n\r\n"), "App profile → local proxy")
 			}
 			return
 		}

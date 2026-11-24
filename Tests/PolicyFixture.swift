@@ -45,7 +45,14 @@ import Foundation
     let values = items.map { $0["PayloadContent"] as! [String: Any] }
     precondition(values.allSatisfy { $0.count == 1 && $0[desktop.id] == nil })
     precondition(Set(items.compactMap { $0["PayloadUUID"] as? String }).count == items.count)
-    precondition(root["PayloadDisplayName"] as? String == "Lobotomy Proxy · Фильтр")
+    let expected = CommandLine.arguments.last!
+    precondition(AppLanguage.current == expected && AppLanguage.resolve([]) == "en")
+    let russian = expected == "ru"
+    precondition(root["PayloadDisplayName"] as? String == (russian ? "Lobotomy Proxy · Фильтр" : "Lobotomy Proxy · Filter"))
+    precondition(Page.connection.title == (russian ? "Подключение" : "Connection"))
+    precondition(localized("Remove %@", "example.com") == (russian ? "Убрать example.com" : "Remove example.com"))
+    precondition(root["PayloadIdentifier"] as? String == Profile.id)
+
     let inventory = [
       "user": [
         [

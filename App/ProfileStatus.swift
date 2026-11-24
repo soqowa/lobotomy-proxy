@@ -6,12 +6,12 @@ enum ProfileCondition: String {
   var installed: Bool { self != .unknown && self != .missing }
   var label: String {
     switch self {
-    case .unknown: return "Список профилей недоступен"
-    case .missing: return "Профиль не установлен"
-    case .previous: return "Установлен профиль прежней версии"
-    case .changed: return "Установлен профиль с другими правилами"
-    case .pending: return "Профиль установлен. Настройки приложения ещё не подтверждены"
-    case .current: return "Установлен профиль с текущими правилами"
+    case .unknown: return localized("Profile list unavailable")
+    case .missing: return localized("Profile not installed")
+    case .previous: return localized("An older profile is installed")
+    case .changed: return localized("The installed profile has different rules")
+    case .pending: return localized("Profile installed. App settings are awaiting verification")
+    case .current: return localized("The installed profile matches the current rules")
     }
   }
 }

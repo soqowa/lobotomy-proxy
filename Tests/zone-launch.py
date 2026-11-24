@@ -29,7 +29,7 @@ app.run()
 ''')
     subprocess.run(["swiftc", source, "-o", exe], check=True)
     subprocess.run(["codesign", "--force", "--sign", "-", child], check=True, capture_output=True)
-    sources = ["Model", "ZoneLaunch", "FilterPolicy", "DomainSelection", "ProfileStatus", "BackgroundRelay"]
+    sources = ["Localization", "Model", "ZoneLaunch", "FilterPolicy", "DomainSelection", "ProfileStatus", "BackgroundRelay"]
     bundle = folder / "Controller.app/Contents"
     for name in ("MacOS", "Resources"):
         (bundle / name).mkdir(parents=True)
