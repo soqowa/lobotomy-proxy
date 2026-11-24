@@ -22,7 +22,7 @@ tag_commit="$(awk 'NF {sha=$1} END {print sha}' <<< "$refs")"
 
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
-asset="Proxy-Guard-$version-macOS-universal.zip"
+asset="Lobotomy-Proxy-$version-macOS-universal.zip"
 app="$stage/Proxy Guard.app"
 if [[ -n "$archive" ]]; then
     cp "$archive" "$stage/$asset"
@@ -71,7 +71,7 @@ fi
 if draft="$(gh release view "$tag" --repo "$repo" --json isDraft --jq .isDraft 2>/dev/null)"; then
     [[ "$draft" == true ]] || { echo "Release $tag is already published." >&2; exit 1; }
 else
-    gh release create "$tag" --repo "$repo" --verify-tag --draft --title "Proxy Guard $version" --notes-file "$stage/notes.md"
+    gh release create "$tag" --repo "$repo" --verify-tag --draft --title "Lobotomy Proxy $version" --notes-file "$stage/notes.md"
 fi
 gh release upload "$tag" "$stage/$asset" "$stage/SHA256SUMS.txt" --repo "$repo" --clobber
 gh release edit "$tag" --repo "$repo" --draft=false --latest --notes-file "$stage/notes.md"

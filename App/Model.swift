@@ -171,8 +171,8 @@ enum Page: String, CaseIterable, Identifiable {
   var id: Self { self }
   var icon: String {
     switch self {
-    case .overview: "shield.lefthalf.filled"
-    case .connection: "point.3.connected.trianglepath.dotted"
+    case .overview: "square.grid.2x2"
+    case .connection: "arrow.left.arrow.right"
     case .filter: "slider.horizontal.3"
     }
   }

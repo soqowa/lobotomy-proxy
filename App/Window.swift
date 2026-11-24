@@ -4,9 +4,105 @@ import SwiftUI
 let accent = Color(
   nsColor: NSColor(name: nil) { look in
     look.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-      ? NSColor(srgbRed: 0.42, green: 0.8, blue: 0.72, alpha: 1)
-      : NSColor(srgbRed: 0.04, green: 0.40, blue: 0.34, alpha: 1)
+      ? NSColor(srgbRed: 1.0, green: 0.66, blue: 0.80, alpha: 1)
+      : NSColor(srgbRed: 0.62, green: 0.16, blue: 0.36, alpha: 1)
   })
+
+private struct SidebarIllustration: View {
+  @Environment(\.colorScheme) private var scheme
+
+  private static let source = Bundle.main.url(forResource: BrandArtwork.resource, withExtension: "svg")
+  private static let light = source.flatMap {
+    try? BrandArtwork.image(from: $0, ink: "#8b405d", paper: "#fff4f7")
+  }
+  private static let dark = source.flatMap {
+    try? BrandArtwork.image(from: $0, ink: "#4b283a", paper: "#e6b5c8")
+  }
+
+  var body: some View {
+    if let mark = scheme == .dark ? Self.dark : Self.light {
+      Image(nsImage: mark).resizable().interpolation(.high).scaledToFit()
+        .accessibilityHidden(true).allowsHitTesting(false)
+    }
+  }
+}
+
+private struct Sidebar: View {
+  @Binding var page: Page
+  let motion: InterfaceMotion
+  @ScaledMetric(relativeTo: .body) private var width: CGFloat = 210
+  @Environment(\.colorScheme) private var scheme
+  @State private var hovered: Page?
+  @Namespace private var navigation
+
+  private var selection: Color {
+    scheme == .dark ? Color(red: 0.94, green: 0.76, blue: 0.83)
+      : Color(red: 0.38, green: 0.19, blue: 0.28)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      VStack(spacing: 4) {
+        ForEach(Page.allCases) { item in
+          row(item)
+        }
+      }
+      .animation(motion.animation, value: page)
+      Spacer(minLength: 24)
+      SidebarIllustration()
+        .frame(maxWidth: .infinity, maxHeight: 150)
+        .padding(.horizontal, 8)
+    }
+    .padding(.horizontal, 14).padding(.top, 33).padding(.bottom, 23)
+    .frame(width: width)
+    .frame(maxHeight: .infinity)
+    .background {
+      LinearGradient(
+        stops: [
+          .init(color: accent.opacity(0.04), location: 0),
+          .init(color: accent.opacity(0.045), location: 0.5),
+          .init(color: accent.opacity(0.14), location: 1)
+        ],
+        startPoint: .top, endPoint: .bottom
+      ).background(Color(nsColor: .windowBackgroundColor))
+    }
+  }
+
+  private func row(_ item: Page) -> some View {
+    let selected = item == page
+    let foreground: Color = scheme == .dark ? Color(red: 0.20, green: 0.11, blue: 0.15) : .white
+    return Button {
+      page = item
+    } label: {
+      HStack(spacing: 12) {
+        Image(systemName: item.icon)
+          .font(.body.weight(.medium)).frame(width: 18)
+          .foregroundStyle(selected ? foreground : .secondary)
+          .accessibilityHidden(true)
+        Text(item.rawValue).fontWeight(selected ? .semibold : .regular)
+          .lineLimit(1).fixedSize(horizontal: true, vertical: false)
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 12).frame(minHeight: 38)
+      .foregroundStyle(selected ? foreground : .primary)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .background {
+      if selected {
+        RoundedRectangle(cornerRadius: 9).fill(selection)
+          .matchedGeometryEffect(id: "selection", in: navigation)
+          .allowsHitTesting(false)
+      } else if hovered == item {
+        RoundedRectangle(cornerRadius: 9).fill(.primary.opacity(0.055)).allowsHitTesting(false)
+      }
+    }
+    .onHover { inside in
+      if inside { hovered = item } else if hovered == item { hovered = nil }
+    }
+    .accessibilityAddTraits(selected ? .isSelected : [])
+  }
+}
 
 struct InterfaceMotion {
   let reduced: Bool
@@ -253,7 +349,7 @@ struct Connection: View {
       Button("Отмена", role: .cancel) {}
       Button("Откатить") { c.restoreZone() }
     } message: {
-      Text("Proxy Guard вернёт сохранённый пояс, если он всё ещё управляет настройкой.")
+      Text("Приложение вернёт сохранённый пояс, если оно всё ещё управляет настройкой.")
     }
   }
   func field<V: View>(_ label: String, @ViewBuilder _ content: () -> V) -> some View {
@@ -266,42 +362,11 @@ struct Connection: View {
 
 struct MainWindow: View {
   @ObservedObject var c: Control
-  @ScaledMetric(relativeTo: .body) private var sidebarWidth: CGFloat = 210
-  @Namespace private var navigation
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     let motion = InterfaceMotion(reduced: reduceMotion)
     HStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 6) {
-        HStack(spacing: 9) {
-          Image(systemName: "shield.lefthalf.filled").font(.system(size: 21, weight: .semibold))
-            .foregroundStyle(accent)
-          Text("Proxy Guard").font(.title3.weight(.semibold)).fixedSize()
-        }.accessibilityElement(children: .combine).padding(.horizontal, 10).padding(.bottom, 20)
-        ForEach(Page.allCases) { p in
-          Button {
-            c.page = p
-          } label: {
-            HStack(spacing: 11) {
-              Image(systemName: p.icon).frame(width: 20)
-              Text(p.rawValue).lineLimit(1).fixedSize(horizontal: true, vertical: false)
-              Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 11).padding(.vertical, 9).contentShape(Rectangle())
-          }.buttonStyle(.plain).background {
-            if c.page == p {
-              RoundedRectangle(cornerRadius: 8).fill(accent.opacity(0.13))
-                .matchedGeometryEffect(id: "selection", in: navigation)
-                .accessibilityHidden(true).allowsHitTesting(false)
-            }
-          }
-          .foregroundStyle(c.page == p ? accent : .primary).accessibilityAddTraits(
-            c.page == p ? .isSelected : [])
-        }
-        Spacer()
-      }.animation(motion.animation, value: c.page)
-      .padding(.horizontal, 12).padding(.top, 23).frame(width: sidebarWidth).background(
-        .regularMaterial)
+      Sidebar(page: $c.page, motion: motion)
       Divider()
       VStack(spacing: 0) {
         ZStack(alignment: .top) {
@@ -415,7 +480,7 @@ struct MainWindow: View {
 struct ProxyGuardApp: App {
   @StateObject private var control = Control()
   var body: some Scene {
-    Window("Proxy Guard", id: "main") {
+    Window("Lobotomy Proxy", id: "main") {
       MainWindow(c: control).onAppear {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
