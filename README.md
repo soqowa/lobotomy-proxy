@@ -1,27 +1,27 @@
 <p align="center">
-  <img src="Brand/readme-icon.png" width="144" height="144" alt="Розовая иконка Lobotomy Proxy">
+  <img src="Brand/readme-icon.png" width="144" height="144" alt="Lobotomy Proxy app icon">
 </p>
 
 <h1 align="center">Lobotomy Proxy</h1>
 
 <p align="center">
-  Выберите, какие сайты и приложения на Mac будут выходить в сеть через ваш прокси.
+  Choose which Mac apps and websites connect through your proxy.
 </p>
 
 <p align="center">
-  <strong><a href="https://github.com/soqowa/lobotomy-proxy/releases/latest">Скачать для macOS</a></strong>
-  &nbsp;·&nbsp; <a href="#быстрый-старт">Быстрый старт</a>
-  &nbsp;·&nbsp; <a href="#сборка-и-проверки">Сборка из исходников</a>
+  <strong><a href="https://github.com/soqowa/lobotomy-proxy/releases/latest">Download for Mac</a></strong>
+  &nbsp;·&nbsp; <a href="#quick-start">Quick&nbsp;start</a>
+  &nbsp;·&nbsp; <a href="#build-from-source">Build&nbsp;guide</a>
 </p>
 
-## Установка
+## Installation
 
-Скачайте ZIP из последнего релиза, распакуйте его и перенесите **Lobotomy Proxy.app** в «Программы». Один архив подходит для Apple Silicon и Intel. Требуется **macOS 14 или новее**. Для скачивания войдите в GitHub под аккаунтом с доступом к репозиторию. Тип подписи указан в описании релиза.
+Download the ZIP from the latest release, unzip it, and move **Lobotomy Proxy.app** to Applications. The universal build runs on Apple Silicon and Intel Macs with **macOS 14 or later**. Sign in to GitHub with an account that has access to the repository. Each release lists the signing certificate used for that build.
 
 <details>
-<summary>Как проверить скачанный архив</summary>
+<summary>Verify the download</summary>
 
-Положите `SHA256SUMS.txt` из того же релиза рядом с ZIP и выполните в этой папке команду
+Save the release’s `SHA256SUMS.txt` alongside the ZIP and run this command in the same directory.
 
 ```sh
 shasum -a 256 -c SHA256SUMS.txt
@@ -30,79 +30,79 @@ shasum -a 256 -c SHA256SUMS.txt
 </details>
 
 <details>
-<summary>Обновление с Proxy Guard</summary>
+<summary>Upgrade from Proxy Guard</summary>
 
-Поместите **Lobotomy Proxy.app** рядом с **Proxy Guard.app** и откройте новую версию. Она подхватит настройки и переключит включённую фоновую службу на новый путь. Когда в «Обзоре» появится «Передача открыта», прежнюю копию можно убрать. Установленный профиль получит новое название при следующем обновлении профиля.
+Place **Lobotomy Proxy.app** next to **Proxy Guard.app** and open the new version. It picks up your settings and points the active background service to the new app. Once the menu bar shield shows a checkmark, you can remove the old copy. The installed configuration profile takes the new name the next time you update it.
 
 </details>
 
-## Быстрый старт
+## Quick start
 
-1. Откройте **Подключение**. Выберите HTTP, HTTPS или SOCKS5, введите адрес, порт и учётные данные прокси. Нажмите **Проверить и сохранить**. Приложение сверит IP выхода по двум сервисам и проверит DNS. Данные для входа сохраняются в Связке ключей macOS.
-2. Откройте **Фильтр**. Добавьте домены вручную или выберите несколько пресетов. Домен включает все его поддомены. Для проксирования всего поддерживаемого веб-трафика приложения добавьте в фильтр само приложение.
-3. Нажмите **Обновить профиль → Открыть настройки системы**. В разделе **Основные → Управление устройством** подтвердите профиль **Lobotomy Proxy · Фильтр**. Для установки службы и DNS macOS может запросить права администратора.
-4. Откройте **Обзор**. После подтверждения настроек передача запустится автоматически. Галочка на щитке в строке меню и статус **Передача открыта** означают, что маршрут подтверждён. Если проверка не прошла, нажмите на щиток, чтобы увидеть причину и открыть «Обзор».
+The app currently uses Russian labels. The sidebar sections, from top to bottom, are **Overview**, **Connection**, and **Filter**.
+
+1. **Connect your proxy.** In Connection, choose HTTP, HTTPS, or SOCKS5 and enter the host, port, and credentials. Test and save the connection. The app checks the exit IP against two services, tests DNS, and stores the credentials in your macOS Keychain.
+2. **Choose what to route.** In Filter, add individual domains or select one or more presets. Each domain includes its subdomains. Add an app to route all of its supported web traffic through the proxy.
+3. **Install the profile.** In Filter, update the profile and open System Settings. Under **General → Device Management**, approve the Lobotomy Proxy profile. macOS may ask for administrator privileges to install the local service and DNS rules.
+4. **Check the shield.** Forwarding starts automatically once the configuration is verified. A checkmark in the menu bar shield means the route is verified. If a check fails, click the shield to see the reason and open Overview.
 
 <details>
-<summary>Как применяются изменения фильтра</summary>
+<summary>How filter edits take effect</summary>
 
-Черновик фильтра сохраняется при редактировании. Если убрать пресет, ручные записи и домены из остальных пресетов сохранятся. Для приложений из прежней версии режим для всех сайтов включится при следующем обновлении профиля. Пока профиль обновляется, обработчик использует действующие системные правила и держит передачу закрытой, если новая конфигурация не прошла проверку.
+Your draft is saved as you edit. Removing a preset keeps manually added domains and domains from other selected presets. Updating a profile from an older version switches its selected apps to all-sites routing. During an update, the relay uses the available system rules and blocks forwarding if it cannot verify the new configuration.
 
 </details>
 
-**Тема оформления** меняется через **щиток в строке меню → Тема**. Доступны системная, светлая и тёмная темы.
+To change the app’s appearance, open **menu bar shield → Theme** and choose System, Light, or Dark.
 
-## DNS и проверка маршрута
+## DNS and route checks
 
-В **Обзоре → Проверка утечек** откройте Net.Coffee в выбранном защищённом браузере. Страница показывает DNS, WebRTC/UDP и часовой пояс этого окна. Профиль включает `ip.net.coffee` и его проверочные поддомены, поэтому в поддерживаемом браузере по умолчанию DNS можно проверить и из обычного окна. [Проверка Net.Coffee](https://ip.net.coffee/claude/)
+In **Overview → Leak check**, open Net.Coffee in a protected browser to inspect the DNS resolvers, WebRTC/UDP results, and time zone it observes. The profile covers `ip.net.coffee` and its test subdomains, so you can also check DNS in a regular window of a supported default browser. [Open the Net.Coffee test](https://ip.net.coffee/claude/)
 
-Для режима **Берлин · CryptoStorm** укажите числовой IP прокси. В этом режиме DNS-запросы идут через прокси по HTTPS. Приложение подключается к полученным IP и блокирует запрос при ошибке DNS. [Резолвер CryptoStorm](https://cryptostorm.is/blog/doh)
+For **Berlin · CryptoStorm** DNS mode, enter the proxy host as a numeric IP address. The app sends DNS-over-HTTPS requests through the proxy, connects to the returned IPs, and blocks the request if DNS resolution fails. [CryptoStorm resolver details](https://cryptostorm.is/blog/doh)
 
-## Часовой пояс
+## Time zone
 
-Приложения из применённого фильтра получают переменную `TZ` с подтверждённым поясом прокси. Фоновая служба отслеживает обычный запуск из Finder и Dock. Если экземпляр запущен без управляемого окружения, служба просит его штатно завершиться и открывает заново с `TZ`.
+Apps in the active filter launch with `TZ` set to the verified proxy time zone, including when opened from Finder or the Dock. If an app is already running without that setting, the service requests a normal quit and relaunches it. Save open documents before applying the profile. The app’s proxy stays closed if it declines to quit, multiple instances are running, or the relaunch cannot be verified. Browsers with their own privacy settings may report a different time zone.
 
-Сохраните документы перед установкой профиля. При отказе приложения выйти, нескольких одновременно запущенных экземплярах или неподтверждённом запуске его прокси остаётся закрытым. При следующем открытии из Dock процедура повторяется. Приложения по-разному используют TZ. Браузер с собственными настройками приватности может показывать другой пояс.
+To apply the proxy time zone to the whole Mac, use **Connection → Time zone**. The rollback control restores the saved setting and checks for any change you made manually. The saved system time zone remains available after removing the filter.
 
-**Подключение → Часовой пояс → Применить к Mac** отдельно меняет системный пояс. **Откатить пояс** восстанавливает сохранённое значение с проверкой на последующий ручной выбор пользователя. Запись о смене системного пояса сохраняется и после удаления фильтра.
+## Routing and rollback
 
-## Маршрутизация и откат
+Domain rules use split DNS, entries in the hosts file, and TLS hostname checks on port 443. Chrome, Edge, Brave, Arc, Vivaldi, and Firefox receive managed browser settings. A selected app gets a fixed local proxy. Other supported browsers use a proxy auto-configuration (PAC) file for the selected domains. Safari uses system DNS. Desktop clients that support `egressProxyUrl` depend on the client’s operating mode.
 
-Общие доменные правила используют локальный split DNS, секцию hosts и проверку имени TLS на порту 443. Chrome, Edge, Brave, Arc, Vivaldi и Firefox получают обязательные настройки браузера. У выбранного приложения фиксированный локальный прокси. Остальные поддерживаемые браузеры получают PAC для общих доменов. Safari использует системный DNS. Для настольного клиента с `egressProxyUrl` поддержка определяется его режимом.
+Direct sockets, virtual machines, some updaters, third-party DNS-over-HTTPS, and VPNs with their own routes can bypass client settings. A successful leak test describes the browser window and network configuration you tested.
 
-Прямые сокеты, виртуальные машины, некоторые обновления, сторонний DoH и VPN с собственными маршрутами могут обходить настройки совместимых клиентов. Прошедший тест относится к конкретному окну и сетевой конфигурации.
+To roll back, open **Filter** and remove the profile using the rollback control. This stops the relay and removes the service, network rules, and configuration profile. Restart the affected apps. Your draft filter and connection settings are kept for reuse.
 
-**Фильтр → Откатить профиль** останавливает обработчик и удаляет сетевые правила, службу и профиль приложения. Перезапустите затронутые приложения. Черновик и данные подключения сохраняются для повторного применения.
+## Build from source
 
-## Сборка и проверки
-
-Сборка проверена с Xcode 27.2 и Go 1.25. Из каталога проекта выполните команду
+The build has been tested with Xcode 27.2 and Go 1.25. From the repository root, run
 
 ```sh
 ./build.sh
 ```
 
-Готовое приложение появится в `../Deliverables/Lobotomy Proxy.app`. Для распространения на другие Mac с проверкой Gatekeeper нужны Developer ID и нотарификация.
+The script writes the universal app to `../Deliverables/Lobotomy Proxy.app`. For distribution through Gatekeeper on other Macs, sign with Developer ID and notarize the build.
 
 <details>
-<summary>Команды для проверки сборки</summary>
+<summary>Run the checks</summary>
 
-- `(cd engine && go test -race ./... && go vet ./...)` проверяет прокси, доменные правила, допуск приложения, отказы и восстановление настроек.
-- `python3 Tests/profile.py` проверяет пресеты, формат профиля и определение состояния.
-- `python3 Tests/zone-launch.py` запускает временное тестовое приложение обычным способом, затем проверяет управляемый перезапуск, TZ и блокировку до подтверждения.
-- `node Tests/chrome-route.cjs` проверяет отключённый прокси на локальных адресах. Требуется playwright-core и полный Chromium. Путь к нему можно задать в PG_TEST_CHROMIUM.
-- `node Tests/net-coffee.cjs` запускает живой браузерный тест через явно указанный тестовый локальный канал PG_DIAGNOSTIC_PROXY и пояс PG_TEST_ZONE. PG_TEST_DNS_COUNTRY и PG_TEST_DNS_CITY задают ожидаемую страну и город всех обнаруженных резолверов. На обычном рабочем Mac для текущего профиля используйте кнопку в **Обзоре**.
+- `(cd engine && go test -race ./... && go vet ./...)` checks proxy routing, domain rules, app admission, failure handling, and rollback.
+- `python3 Tests/profile.py` checks presets, profile generation, and installed-profile detection.
+- `python3 Tests/zone-launch.py` launches a temporary app and checks its managed relaunch, process time zone, and blocking until verification.
+- `node Tests/chrome-route.cjs` checks that protected requests to a local test server are blocked when the proxy is down. It requires `playwright-core` and a full Chromium build. Set `PG_TEST_CHROMIUM` to select the browser executable.
+- `node Tests/net-coffee.cjs` runs the live browser test through the local test proxy set in `PG_DIAGNOSTIC_PROXY`, using `PG_TEST_ZONE` for the time zone. Set `PG_TEST_DNS_COUNTRY` and `PG_TEST_DNS_CITY` to check every observed resolver. To test the active profile on your Mac, use the check in Overview.
 
 </details>
 
-Для оформления боковой панели и иконки Dock используется один SVG. Контур наследует `currentColor`, заливку задаёт путь `paper`. [Исходник логотипа](Brand/lobotomy-proxy.svg)
+The sidebar and Dock icon share one SVG. The outline inherits `currentColor` and the `paper` path sets the fill. [Logo source](Brand/lobotomy-proxy.svg)
 
-### Выпуск версии
+### Cut a release
 
-Проверки в GitHub Actions запускаются для изменений в `main` и pull request. На macOS выполняются тесты Go с проверкой гонок, `go vet`, тест профиля и сборка Universal для двух архитектур.
+GitHub Actions runs the Go race tests, `go vet`, profile checks, and a universal macOS build on pushes and pull requests to `main`.
 
-1. Обновите файл `VERSION`, зафиксируйте изменения и отправьте их в `main`. Проверьте результат CI.
-2. На Mac с Xcode, Go, GitHub CLI и сертификатом подписи запустите `./scripts/release.sh`. Скрипт собирает приложение, создаёт тег, загружает ZIP и SHA-256 и публикует релиз. Закрытый ключ используется локально через Связку ключей.
-3. Для публикации уже проверенного ZIP той же версии передайте его путь аргументом, например `./scripts/release.sh "../Deliverables/Lobotomy Proxy macOS.zip"`. Для нотарифицированного релиза передайте заранее нотарифицированную сборку со вложенным билетом. Для собственных заметок задайте `RELEASE_NOTES_FILE` с путём к Markdown-файлу.
+1. Update `VERSION`, commit and push to `main`, and check the CI result.
+2. On a Mac with Xcode, Go, GitHub CLI, and a signing identity, run `./scripts/release.sh`. It builds the app, tags the commit, and publishes the ZIP and SHA-256 checksum. Signing uses the private key in the local Keychain.
+3. To publish a ZIP you already tested, pass its path to the script, for example `./scripts/release.sh "../Deliverables/Lobotomy Proxy macOS.zip"`. For a notarized release, supply a notarized build with its ticket stapled. To provide release notes, set `RELEASE_NOTES_FILE` to the path of a Markdown file.
 
-`PROXYGUARD_SIGNING_IDENTITY` позволяет выбрать сертификат явно. По умолчанию скрипт сначала ищет Developer ID Application, затем Apple Development.
+Set `PROXYGUARD_SIGNING_IDENTITY` to choose a signing identity explicitly. By default, the script looks for a Developer ID Application certificate first, then an Apple Development certificate.
