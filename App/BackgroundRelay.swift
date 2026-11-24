@@ -44,22 +44,28 @@ enum BackgroundRelay {
     if exists { try FileManager.default.removeItem(at: plist) }
     try? FileManager.default.removeItem(at: statusURL)
   }
-  static func migrateLegacyJob() throws {
+  private static var executable: URL {
+    Tools.host.bundleURL.appendingPathComponent(
+      "Contents/Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay")
+  }
+  static func refreshInstalledJob() throws {
     guard try owned(), let old = Tools.host.executableURL,
       let spec = try PropertyListSerialization.propertyList(
         from: Data(contentsOf: plist), options: [], format: nil) as? [String: Any],
-      spec["ProgramArguments"] as? [String] == [old.path, "--background-relay"]
+      let args = spec["ProgramArguments"] as? [String],
+      args == [old.path, "--background-relay"] || args == [executable.path, "--background-relay"]
     else { return }
-    try enable()
+    let environment = spec["EnvironmentVariables"] as? [String: String]
+    if args[0] == old.path || environment?["PROXYGUARD_RELAY_BUILD"] != buildID { try enable() }
   }
   static func enable() throws {
-    let exe = Tools.host.bundleURL.appendingPathComponent(
-      "Contents/Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay")
+    let exe = executable
     guard FileManager.default.isExecutableFile(atPath: exe.path) else {
       throw GuardError.message("Фоновая служба отсутствует в сборке.")
     }
     let spec: [String: Any] = [
       "Label": label, "ProgramArguments": [exe.path, "--background-relay"],
+      "EnvironmentVariables": ["PROXYGUARD_RELAY_BUILD": buildID],
       "RunAtLoad": true, "KeepAlive": true, "ThrottleInterval": 5, "ProcessType": "Background",
     ]
     let data = try PropertyListSerialization.data(fromPropertyList: spec, format: .xml, options: 0)
@@ -77,7 +83,7 @@ enum BackgroundRelay {
     }
   }
   static var buildID: String {
-    Tools.host.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
   }
   static func snapshot() -> Event? {
     guard let data = try? Data(contentsOf: statusURL),

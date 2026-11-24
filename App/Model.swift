@@ -269,7 +269,7 @@ enum Page: String, CaseIterable, Identifiable {
       draftLoaded = true
     }
     draft = draft.fullApplications
-    do { try BackgroundRelay.migrateLegacyJob() } catch { notice = error.localizedDescription }
+    do { try BackgroundRelay.refreshInstalledJob() } catch { notice = error.localizedDescription }
     refresh()
     timer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.refresh() }

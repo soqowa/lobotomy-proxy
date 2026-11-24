@@ -14,7 +14,7 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>local.proxyguard.app</string>
 <key>CFBundleName</key><string>Lobotomy Proxy</string>
 <key>CFBundleDisplayName</key><string>Lobotomy Proxy</string>
-<key>CFBundleVersion</key><string>7</string>
+<key>CFBundleVersion</key><string>8</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -48,7 +48,7 @@ cat > "$relay/Contents/Info.plist" <<'RELAY'
 <key>CFBundleIdentifier</key><string>local.proxyguard.relay-agent</string>
 <key>CFBundleName</key><string>Proxy Guard Relay</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>7</string>
+<key>CFBundleVersion</key><string>8</string>
 <key>LSBackgroundOnly</key><true/>
 </dict></plist>
 RELAY

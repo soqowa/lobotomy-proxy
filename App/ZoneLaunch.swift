@@ -68,8 +68,9 @@ import Foundation
         else { return }
         let config = NSWorkspace.OpenConfiguration()
         config.environment = ["TZ": zone]
+        // The desktop adapter reads egressProxyUrl from the managed profile and rejects network switches.
         if let app = FilterCatalog.shared.apps.first(where: { $0.id == id }),
-          app.adapter == "chromium" || app.adapter == "desktop"
+          app.adapter == "chromium"
         {
           config.arguments = [
             "--proxy-server=http://127.0.0.1:" + String(app.port),
