@@ -31,76 +31,48 @@ private struct Sidebar: View {
   @Binding var page: Page
   let motion: InterfaceMotion
   @ScaledMetric(relativeTo: .body) private var width: CGFloat = 210
-  @Environment(\.colorScheme) private var scheme
-  @State private var hovered: Page?
   @Namespace private var navigation
 
-  private var selection: Color {
-    scheme == .dark ? Color(red: 0.94, green: 0.76, blue: 0.83)
-      : Color(red: 0.38, green: 0.19, blue: 0.28)
-  }
-
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      VStack(spacing: 4) {
-        ForEach(Page.allCases) { item in
-          row(item)
+    VStack(alignment: .leading, spacing: 6) {
+      ForEach(Page.allCases) { item in
+        Button {
+          page = item
+        } label: {
+          HStack(spacing: 11) {
+            Image(systemName: item.icon).frame(width: 20).accessibilityHidden(true)
+            Text(item.rawValue).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 0)
+          }
+          .padding(.horizontal, 11).padding(.vertical, 9).contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .background {
+          if page == item {
+            RoundedRectangle(cornerRadius: 8).fill(accent.opacity(0.13))
+              .matchedGeometryEffect(id: "selection", in: navigation)
+              .accessibilityHidden(true).allowsHitTesting(false)
+          }
+        }
+        .foregroundStyle(page == item ? accent : .primary)
+        .accessibilityAddTraits(page == item ? .isSelected : [])
       }
-      .animation(motion.animation, value: page)
       Spacer(minLength: 24)
       SidebarIllustration()
         .frame(maxWidth: .infinity, maxHeight: 150)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
     }
-    .padding(.horizontal, 14).padding(.top, 33).padding(.bottom, 23)
+    .animation(motion.animation, value: page)
+    .padding(.horizontal, 12).padding(.top, 40).padding(.bottom, 23)
     .frame(width: width)
     .frame(maxHeight: .infinity)
     .background {
-      LinearGradient(
-        stops: [
-          .init(color: accent.opacity(0.04), location: 0),
-          .init(color: accent.opacity(0.045), location: 0.5),
-          .init(color: accent.opacity(0.14), location: 1)
-        ],
-        startPoint: .top, endPoint: .bottom
-      ).background(Color(nsColor: .windowBackgroundColor))
+      LinearGradient(stops: [
+        .init(color: .clear, location: 0.65),
+        .init(color: accent.opacity(0.08), location: 1)
+      ], startPoint: .top, endPoint: .bottom)
+        .background(.regularMaterial)
     }
-  }
-
-  private func row(_ item: Page) -> some View {
-    let selected = item == page
-    let foreground: Color = scheme == .dark ? Color(red: 0.20, green: 0.11, blue: 0.15) : .white
-    return Button {
-      page = item
-    } label: {
-      HStack(spacing: 12) {
-        Image(systemName: item.icon)
-          .font(.body.weight(.medium)).frame(width: 18)
-          .foregroundStyle(selected ? foreground : .secondary)
-          .accessibilityHidden(true)
-        Text(item.rawValue).fontWeight(selected ? .semibold : .regular)
-          .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, 12).frame(minHeight: 38)
-      .foregroundStyle(selected ? foreground : .primary)
-      .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .background {
-      if selected {
-        RoundedRectangle(cornerRadius: 9).fill(selection)
-          .matchedGeometryEffect(id: "selection", in: navigation)
-          .allowsHitTesting(false)
-      } else if hovered == item {
-        RoundedRectangle(cornerRadius: 9).fill(.primary.opacity(0.055)).allowsHitTesting(false)
-      }
-    }
-    .onHover { inside in
-      if inside { hovered = item } else if hovered == item { hovered = nil }
-    }
-    .accessibilityAddTraits(selected ? .isSelected : [])
   }
 }
 
@@ -403,7 +375,7 @@ struct MainWindow: View {
         }
       }.frame(maxWidth: .infinity, maxHeight: .infinity).background(
         Color(nsColor: .windowBackgroundColor))
-    }.tint(accent).frame(minWidth: 790, minHeight: 600)
+    }.ignoresSafeArea(.container, edges: .top).tint(accent).frame(minWidth: 790, minHeight: 600)
   }
 }
 @main enum ProxyGuardEntry {
@@ -485,6 +457,6 @@ struct ProxyGuardApp: App {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
       }
-    }.defaultSize(width: 960, height: 746)
+    }.windowStyle(.hiddenTitleBar).defaultSize(width: 960, height: 746)
   }
 }
