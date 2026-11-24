@@ -20,7 +20,7 @@ async function listen(server) {
   return server.address().port;
 }
 async function main() {
-  const binary = path.resolve(process.argv[2] || '../Deliverables/Proxy Guard.app/Contents/MacOS/ProxyGuard');
+  const binary = path.resolve(process.argv[2] || '../Deliverables/Lobotomy Proxy.app/Contents/MacOS/LobotomyProxy');
   const hits = new Set();
   const origin = http.createServer((req,res) => { hits.add(req.url); res.end('origin'); });
   const port = await listen(origin);

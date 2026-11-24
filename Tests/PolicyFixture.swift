@@ -2,6 +2,17 @@ import Foundation
 
 @main enum PolicyFixture {
   static func main() throws {
+    for (bundle, binary) in [
+      ("Proxy Guard", "Contents/MacOS/ProxyGuard"),
+      ("Proxy Guard", "Contents/Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay"),
+      ("Lobotomy Proxy", "Contents/Library/LoginItems/Lobotomy Proxy Relay.app/Contents/MacOS/LobotomyProxyRelay"),
+    ] {
+      let host = "/Applications/" + bundle + ".app"
+      let path = host + "/" + binary
+      precondition(BackgroundRelay.jobHost([path, "--background-relay"])?.path == host)
+      precondition(BackgroundRelay.jobHost([path, "--relay-worker"]) == nil)
+    }
+    precondition(BackgroundRelay.jobHost(["/tmp/Contents/MacOS/ProxyGuard", "--background-relay"]) == nil)
     let presets = FilterCatalog.shared.presets
     precondition(Set(presets.map(\.id)).count == 4)
     let a = FilterPreset(id: "one", name: "One", domains: ["common.example", "one.example"])
@@ -34,7 +45,7 @@ import Foundation
     let values = items.map { $0["PayloadContent"] as! [String: Any] }
     precondition(values.allSatisfy { $0.count == 1 && $0[desktop.id] == nil })
     precondition(Set(items.compactMap { $0["PayloadUUID"] as? String }).count == items.count)
-    precondition(root["PayloadDisplayName"] as? String == "Proxy Guard · Фильтр")
+    precondition(root["PayloadDisplayName"] as? String == "Lobotomy Proxy · Фильтр")
     let inventory = [
       "user": [
         [

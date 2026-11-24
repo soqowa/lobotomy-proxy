@@ -8,8 +8,13 @@ enum BackgroundRelay {
   static let ctl = URL(fileURLWithPath: "/bin/launchctl")
   static let plist = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
     "Library/LaunchAgents/" + label + ".plist")
-  static let folder = FileManager.default.urls(
-    for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Proxy Guard")
+  static let folder: URL = {
+    let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    let previous = support.appendingPathComponent("Proxy Guard", isDirectory: true)
+    // Reuse launch receipts and profile exports from existing installations.
+    return FileManager.default.fileExists(atPath: previous.path)
+      ? previous : support.appendingPathComponent("Lobotomy Proxy", isDirectory: true)
+  }()
   static let statusURL = folder.appendingPathComponent("RelayStatus.json")
   struct Snapshot: Codable {
     let event: Event
@@ -17,6 +22,18 @@ enum BackgroundRelay {
     var build: String?
   }
 
+  private static let relayPath = "Contents/Library/LoginItems/Lobotomy Proxy Relay.app/Contents/MacOS/LobotomyProxyRelay"
+  static func jobHost(_ arguments: [String]) -> URL? {
+    guard arguments.count == 2, arguments[1] == "--background-relay",
+      arguments[0].hasPrefix("/") else { return nil }
+    let suffixes = [
+      "/" + relayPath, "/Contents/MacOS/ProxyGuard",
+      "/Contents/Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay",
+    ]
+    guard let suffix = suffixes.first(where: { arguments[0].hasSuffix($0) }) else { return nil }
+    let host = URL(fileURLWithPath: String(arguments[0].dropLast(suffix.count)), isDirectory: true)
+    return host.pathExtension == "app" ? host.standardizedFileURL : nil
+  }
   static func owned() throws -> Bool {
     guard FileManager.default.fileExists(atPath: plist.path) else { return false }
     let data = try Data(contentsOf: plist)
@@ -24,9 +41,7 @@ enum BackgroundRelay {
       let spec = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
         as? [String: Any],
       spec["Label"] as? String == label, let args = spec["ProgramArguments"] as? [String],
-      args.count == 2, args[1] == "--background-relay",
-      args[0].hasSuffix("/Contents/MacOS/ProxyGuard")
-        || args[0].hasSuffix("/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay")
+      jobHost(args) != nil
     else { throw GuardError.message("Файл фоновой службы занят другой настройкой.") }
     return true
   }
@@ -37,7 +52,7 @@ enum BackgroundRelay {
     let exists = try owned()
     if loaded() {
       guard exists else {
-        throw GuardError.message("Найден одноимённый фоновый процесс без файла Proxy Guard.")
+        throw GuardError.message("Найден одноимённый фоновый процесс без файла Lobotomy Proxy.")
       }
       _ = try Tools.run(ctl, ["bootout", domain + "/" + label])
     }
@@ -45,18 +60,23 @@ enum BackgroundRelay {
     try? FileManager.default.removeItem(at: statusURL)
   }
   private static var executable: URL {
-    Tools.host.bundleURL.appendingPathComponent(
-      "Contents/Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay")
+    Tools.host.bundleURL.appendingPathComponent(relayPath)
   }
   static func refreshInstalledJob() throws {
-    guard try owned(), let old = Tools.host.executableURL,
+    guard try owned(),
       let spec = try PropertyListSerialization.propertyList(
         from: Data(contentsOf: plist), options: [], format: nil) as? [String: Any],
       let args = spec["ProgramArguments"] as? [String],
-      args == [old.path, "--background-relay"] || args == [executable.path, "--background-relay"]
+      let registered = jobHost(args)
+    else { return }
+    let host = Tools.host.bundleURL.standardizedFileURL
+    let previous = host.deletingLastPathComponent().appendingPathComponent("Proxy Guard.app", isDirectory: true)
+    guard registered == host || registered == previous || !FileManager.default.fileExists(atPath: args[0])
     else { return }
     let environment = spec["EnvironmentVariables"] as? [String: String]
-    if args[0] == old.path || environment?["PROXYGUARD_RELAY_BUILD"] != buildID { try enable() }
+    if args[0] != executable.path || environment?["PROXYGUARD_RELAY_BUILD"] != buildID || !loaded() {
+      try enable()
+    }
   }
   static func enable() throws {
     let exe = executable
@@ -72,11 +92,28 @@ enum BackgroundRelay {
     try FileManager.default.createDirectory(
       at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
     let exists = try owned()
-    if exists, (try Data(contentsOf: plist)) != data { try disable() }
-    if !FileManager.default.fileExists(atPath: plist.path) {
+    let previous = exists ? try Data(contentsOf: plist) : nil
+    let running = loaded()
+    if running && !exists {
+      throw GuardError.message("Найден одноимённый фоновый процесс без файла Lobotomy Proxy.")
+    }
+    if let previous, previous != data {
+      // Keep a valid job on disk throughout the upgrade, including across a logout.
+      try data.write(to: plist, options: .atomic)
+      do {
+        if running { _ = try Tools.run(ctl, ["bootout", domain + "/" + label]) }
+        _ = try Tools.run(ctl, ["bootstrap", domain, plist.path])
+      } catch {
+        try previous.write(to: plist, options: .atomic)
+        if running && !loaded() { _ = try Tools.run(ctl, ["bootstrap", domain, plist.path]) }
+        throw error
+      }
+      return
+    }
+    if !exists {
       try data.write(to: plist, options: .withoutOverwriting)
     }
-    if !loaded() {
+    if !running {
       _ = try Tools.run(ctl, ["bootstrap", domain, plist.path])
     } else if snapshot() == nil {
       _ = try Tools.run(ctl, ["kickstart", "-k", domain + "/" + label])

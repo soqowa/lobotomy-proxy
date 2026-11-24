@@ -380,7 +380,7 @@ struct MainWindow: View {
     }.ignoresSafeArea(.container, edges: .top).tint(accent).frame(minWidth: 790, minHeight: 600)
   }
 }
-@main enum ProxyGuardEntry {
+@main enum LobotomyProxyEntry {
   @MainActor static func main() {
     if CommandLine.arguments.dropFirst().elementsEqual(["--relay-worker"]) {
       do { try BackgroundRelay.execWorker() } catch {
@@ -447,7 +447,7 @@ struct MainWindow: View {
         exit(1)
       }
     }
-    ProxyGuardApp.main()
+    LobotomyProxyApp.main()
   }
 }
 
@@ -471,7 +471,7 @@ private enum AppTheme: String, CaseIterable {
   }
 }
 
-struct ProxyGuardApp: App {
+struct LobotomyProxyApp: App {
   @StateObject private var control = Control()
   @AppStorage("appTheme") private var theme: AppTheme = .system
   @Environment(\.openWindow) private var openWindow

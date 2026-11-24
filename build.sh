@@ -1,20 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")"
-dest="${1:-$(pwd)/../Deliverables/Proxy Guard.app}"
+dest="${1:-$(pwd)/../Deliverables/Lobotomy Proxy.app}"
 mkdir -p "$(dirname "$dest")"
 temp="$(mktemp -d)"
 trap 'rm -rf "$temp"' EXIT
-app="$temp/Proxy Guard.app"
+app="$temp/Lobotomy Proxy.app"
 mkdir -p "$app/Contents"/{MacOS,Helpers,Resources} "$temp/Icon.iconset"
 cat > "$app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>ProxyGuard</string>
+<key>CFBundleExecutable</key><string>LobotomyProxy</string>
 <key>CFBundleIdentifier</key><string>local.proxyguard.app</string>
 <key>CFBundleName</key><string>Lobotomy Proxy</string>
 <key>CFBundleDisplayName</key><string>Lobotomy Proxy</string>
-<key>CFBundleVersion</key><string>8</string>
+<key>CFBundleVersion</key><string>9</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -33,33 +33,37 @@ for arch in arm64 amd64; do
     (cd engine && CGO_ENABLED=1 MACOSX_DEPLOYMENT_TARGET=14.0 CC="clang -arch $swarch" GOARCH="$arch" go build -trimpath -ldflags='-s -w' -o "$temp/core-$arch" .)
     swiftc -O -parse-as-library -target "$swarch-apple-macos14.0" App/Model.swift App/Window.swift App/BrandArtwork.swift App/ZoneLaunch.swift App/FilterPolicy.swift App/FilterView.swift App/ProfileStatus.swift App/BackgroundRelay.swift App/DomainSelection.swift -o "$temp/ui-$arch"
 done
-lipo -create "$temp/core-arm64" "$temp/core-amd64" -output "$app/Contents/Helpers/proxyguard"
-lipo -create "$temp/ui-arm64" "$temp/ui-amd64" -output "$app/Contents/MacOS/ProxyGuard"
+lipo -create "$temp/core-arm64" "$temp/core-amd64" -output "$app/Contents/Helpers/lobotomy-proxy"
+lipo -create "$temp/ui-arm64" "$temp/ui-amd64" -output "$app/Contents/MacOS/LobotomyProxy"
 cp engine/catalog.json "$app/Contents/Resources/catalog.json"
 identity="${PROXYGUARD_SIGNING_IDENTITY:--}"
-codesign --force --sign "$identity" --timestamp=none --options runtime --identifier local.proxyguard.engine "$app/Contents/Helpers/proxyguard"
-relay="$app/Contents/Library/LoginItems/Proxy Guard Relay.app"
+codesign --force --sign "$identity" --timestamp=none --options runtime --identifier local.proxyguard.engine "$app/Contents/Helpers/lobotomy-proxy"
+relay="$app/Contents/Library/LoginItems/Lobotomy Proxy Relay.app"
 mkdir -p "$relay/Contents/MacOS"
-cp "$app/Contents/MacOS/ProxyGuard" "$relay/Contents/MacOS/ProxyGuardRelay"
+cp "$app/Contents/MacOS/LobotomyProxy" "$relay/Contents/MacOS/LobotomyProxyRelay"
 cat > "$relay/Contents/Info.plist" <<'RELAY'
 <?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>ProxyGuardRelay</string>
+<key>CFBundleExecutable</key><string>LobotomyProxyRelay</string>
 <key>CFBundleIdentifier</key><string>local.proxyguard.relay-agent</string>
-<key>CFBundleName</key><string>Proxy Guard Relay</string>
+<key>CFBundleName</key><string>Lobotomy Proxy Relay</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleVersion</key><string>8</string>
+<key>CFBundleVersion</key><string>9</string>
 <key>LSBackgroundOnly</key><true/>
 </dict></plist>
 RELAY
 codesign --force --sign "$identity" --timestamp=none --options runtime "$relay"
-digest="$(shasum -a 256 "$app/Contents/Helpers/proxyguard" | cut -d" " -f1)"
-plutil -insert ProxyGuardHelperSHA256 -string "$digest" "$app/Contents/Info.plist"
-# Pin an explicitly verified, wire-compatible previous system helper when packaging a GUI-only upgrade.
+digest="$(shasum -a 256 "$app/Contents/Helpers/lobotomy-proxy" | cut -d" " -f1)"
+plutil -insert LobotomyProxyHelperSHA256 -string "$digest" "$app/Contents/Info.plist"
+# Pin verified, wire-compatible system helpers when packaging an upgrade.
 compatible="${PROXYGUARD_COMPATIBLE_HELPER_SHA256:-}"
 if [[ -n "$compatible" ]]; then
-    [[ "$compatible" =~ ^[0-9a-f]{64}$ ]]
-    plutil -insert ProxyGuardCompatibleHelperSHA256 -string "$compatible" "$app/Contents/Info.plist"
+    read -r -a hashes <<< "$compatible"
+    plutil -insert LobotomyProxyCompatibleHelperHashes -json '[]' "$app/Contents/Info.plist"
+    for index in "${!hashes[@]}"; do
+        [[ "${hashes[$index]}" =~ ^[0-9a-f]{64}$ ]]
+        plutil -insert "LobotomyProxyCompatibleHelperHashes.$index" -string "${hashes[$index]}" "$app/Contents/Info.plist"
+    done
 fi
 codesign --force --sign "$identity" --timestamp=none --options runtime "$app"
 codesign --verify --deep --strict "$app"

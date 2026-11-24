@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory() as tmp:
     exe.parent.mkdir(parents=True)
     (child / "Contents/Info.plist").write_bytes(plistlib.dumps({
         "CFBundleIdentifier": "local.proxyguard.test." + uuid.uuid4().hex,
-        "CFBundleName": "Proxy Guard Test", "CFBundlePackageType": "APPL", "CFBundleExecutable": "Sample",
+        "CFBundleName": "Lobotomy Proxy Test", "CFBundlePackageType": "APPL", "CFBundleExecutable": "Sample",
         "LSUIElement": True,
     }))
     source = folder / "Sample.swift"

@@ -165,15 +165,14 @@ enum Profile {
     let profile: [String: Any] = [
       "PayloadType": "Configuration", "PayloadIdentifier": id,
       "PayloadUUID": "ED74DD1A-0599-595D-AE6C-AD206E96B626", "PayloadVersion": 1,
-      "PayloadScope": "User", "PayloadDisplayName": "Proxy Guard · Фильтр",
+      "PayloadScope": "User", "PayloadDisplayName": "Lobotomy Proxy · Фильтр",
       "PayloadDescription": "Маршрутизация по выбранным доменам и приложениям.",
       "PayloadContent": payloads,
     ]
     return try PropertyListSerialization.data(fromPropertyList: profile, format: .xml, options: 0)
   }
   static func open(_ policy: FilterPolicy) throws {
-    let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent("Proxy Guard/Profiles")
+    let folder = BackgroundRelay.folder.appendingPathComponent("Profiles")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let path = folder.appendingPathComponent(
       "Filter-" + (try signature(policy).prefix(16)) + ".mobileconfig")

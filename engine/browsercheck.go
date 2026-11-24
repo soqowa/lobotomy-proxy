@@ -17,7 +17,7 @@ const checkHost = "route.proxyguard.test"
 // No third-party assets and no JavaScript network access. The browser's time zone stays on the page.
 var checkPage = template.Must(template.New("check").Parse(`<!doctype html>
 <html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Проверка браузера · Proxy Guard</title>
+<title>Проверка браузера · Lobotomy Proxy</title>
 <style>:root{color-scheme:light dark}body{font:16px/1.5 -apple-system,system-ui,sans-serif;max-width:36rem;margin:12vh auto;padding:0 24px}h1{font-size:30px}dt{color:#777;margin-top:18px}dd{font-weight:600;margin:3px 0}small{display:block;margin-top:28px}</style>
 <h1>Проверка браузера</h1><dl><dt>Маршрут этого запроса</dt><dd>{{.Route}}</dd>
 <dt>Часовой пояс выхода при установке</dt><dd id="expected">{{.Zone}}</dd>

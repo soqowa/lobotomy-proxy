@@ -97,11 +97,12 @@ enum Tools {
   }
   static func supportsInstalledFilter(_ digest: String?) -> Bool {
     guard let digest, !digest.isEmpty else { return false }
-    return digest == host.object(forInfoDictionaryKey: "ProxyGuardHelperSHA256") as? String
-      || digest == host.object(forInfoDictionaryKey: "ProxyGuardCompatibleHelperSHA256") as? String
+    let compatible = host.object(forInfoDictionaryKey: "LobotomyProxyCompatibleHelperHashes") as? [String] ?? []
+    return digest == host.object(forInfoDictionaryKey: "LobotomyProxyHelperSHA256") as? String
+      || compatible.contains(digest)
   }
   static var engine: URL {
-    host.bundleURL.appendingPathComponent("Contents/Helpers/proxyguard")
+    host.bundleURL.appendingPathComponent("Contents/Helpers/lobotomy-proxy")
   }
   static func run(_ url: URL, _ args: [String], input: Data? = nil) throws -> Data {
     let p = Process()
@@ -135,7 +136,7 @@ enum Tools {
   }
   static func admin(_ args: [String]) throws {
     guard
-      let digest = Bundle.main.object(forInfoDictionaryKey: "ProxyGuardHelperSHA256") as? String,
+      let digest = Bundle.main.object(forInfoDictionaryKey: "LobotomyProxyHelperSHA256") as? String,
       digest.count == 64, digest.allSatisfy({ $0.isHexDigit })
     else { throw GuardError.message("В сборке отсутствует контрольная сумма службы.") }
     let stage = #"""

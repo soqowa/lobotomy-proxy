@@ -31,7 +31,7 @@ async function run() {
   const city = process.env.PG_TEST_DNS_CITY;
   const country = process.env.PG_TEST_DNS_COUNTRY;
   assert.ok(city && country, 'Set the expected resolver city and country');
-  const binary=path.resolve(process.argv[2] || '../Deliverables/Proxy Guard.app/Contents/MacOS/ProxyGuard');
+  const binary=path.resolve(process.argv[2] || '../Deliverables/Lobotomy Proxy.app/Contents/MacOS/LobotomyProxy');
   const domainMode = process.env.PG_TEST_PAC === '1';
   const profile=execFileSync(binary,['--export-profile'],{input:JSON.stringify({domains:[],applications:domainMode ? [] : [{id:'com.google.Chrome',all:true,domains:[]}]})});
   const settings=JSON.parse(execFileSync('python3',['-c','import plistlib,sys,json; p=plistlib.loads(sys.stdin.buffer.read()); print(json.dumps(next(s["PayloadContent"]["com.google.Chrome"]["Forced"][0]["mcx_preference_settings"] for s in p["PayloadContent"] if "com.google.Chrome" in s["PayloadContent"])))'],{input:profile}));

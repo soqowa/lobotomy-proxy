@@ -160,7 +160,7 @@ func ownedBlock(b []byte) (string, error) {
 		return "", nil
 	}
 	if a < 0 || z < a || (a > 0 && b[a-1] != '\n') || bytes.Count(b, []byte(prefix)) != 1 || bytes.Count(b, []byte(suffix)) != 1 {
-		return "", errors.New("повреждена секция Proxy Guard в hosts")
+		return "", errors.New("повреждена секция Lobotomy Proxy в hosts")
 	}
 	return string(b[a : z+len(suffix)]), nil
 }

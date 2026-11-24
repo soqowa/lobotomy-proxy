@@ -23,7 +23,7 @@ tag_commit="$(awk 'NF {sha=$1} END {print sha}' <<< "$refs")"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 asset="Lobotomy-Proxy-$version-macOS-universal.zip"
-app="$stage/Proxy Guard.app"
+app="$stage/Lobotomy Proxy.app"
 if [[ -n "$archive" ]]; then
     cp "$archive" "$stage/$asset"
     ditto -x -k "$stage/$asset" "$stage"
@@ -49,7 +49,7 @@ if ! grep -Eq '^Authority=(Apple Development|Developer ID Application):' <<< "$s
     echo 'Expected an Apple Development or Developer ID Application signature.' >&2
     exit 1
 fi
-for binary in 'MacOS/ProxyGuard' 'Helpers/proxyguard' 'Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay'; do
+for binary in 'MacOS/LobotomyProxy' 'Helpers/lobotomy-proxy' 'Library/LoginItems/Lobotomy Proxy Relay.app/Contents/MacOS/LobotomyProxyRelay'; do
     for arch in arm64 x86_64; do
         lipo -verify_arch "$arch" "$app/Contents/$binary"
     done
