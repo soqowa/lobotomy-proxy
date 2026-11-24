@@ -50,7 +50,9 @@ if ! grep -Eq '^Authority=(Apple Development|Developer ID Application):' <<< "$s
     exit 1
 fi
 for binary in 'MacOS/ProxyGuard' 'Helpers/proxyguard' 'Library/LoginItems/Proxy Guard Relay.app/Contents/MacOS/ProxyGuardRelay'; do
-    lipo -verify_arch arm64 x86_64 "$app/Contents/$binary"
+    for arch in arm64 x86_64; do
+        lipo -verify_arch "$arch" "$app/Contents/$binary"
+    done
 done
 (cd "$stage" && shasum -a 256 "$asset" > SHA256SUMS.txt)
 if [[ -n "${RELEASE_NOTES_FILE:-}" ]]; then
