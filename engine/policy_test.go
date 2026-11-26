@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -163,5 +164,18 @@ func TestApplicationProxyForwardAndOutage(t *testing.T) {
 		if resp.StatusCode != code {
 			t.Errorf("%s: %d", dest, resp.StatusCode)
 		}
+	}
+}
+
+func TestPreZenServicePlistMigration(t *testing.T) {
+	const id = "app.zen-browser.zen"
+	zenSocket := []byte("<key>" + id + "</key>" + socketSpec("stream", "17748"))
+	current := plist()
+	if bytes.Count(current, zenSocket) != 1 {
+		t.Fatal("missing or duplicate Zen listener")
+	}
+	prior := bytes.Replace(current, zenSocket, nil, 1)
+	if !preZenServicePlist(prior) || preZenServicePlist(current) || preZenServicePlist(append(prior, ' ')) {
+		t.Fatal("migration must recognize exactly the pre-Zen service definition")
 	}
 }

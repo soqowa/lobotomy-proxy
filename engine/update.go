@@ -88,9 +88,10 @@ func install(uid int, zone string, desired Policy) error {
 			oldSpec = string(plist())
 		}
 		spec, e := os.ReadFile(jobFile)
-		if e != nil || string(spec) != oldSpec {
+		if e != nil || (string(spec) != oldSpec && (s.Filter == nil || !preZenServicePlist(spec))) {
 			return errors.New(message("the service definition was changed externally"))
 		}
+		oldSpec = string(spec)
 	}
 	oldRules := []string{}
 	if block != "" {

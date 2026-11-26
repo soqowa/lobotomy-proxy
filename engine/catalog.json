@@ -77,6 +77,13 @@
       "port": 17746
     },
     {
+      "id": "app.zen-browser.zen",
+      "name": "Zen",
+      "adapter": "firefox",
+      "disableWebRTC": true,
+      "port": 17748
+    },
+    {
       "id": "com.anthropic.claudefordesktop",
       "name": "Claude Desktop",
       "adapter": "desktop",

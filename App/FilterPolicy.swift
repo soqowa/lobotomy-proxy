@@ -5,6 +5,7 @@ import Foundation
 struct ManagedApp: Codable, Identifiable {
   let id, name, adapter: String
   let port: Int
+  let disableWebRTC: Bool?
 }
 struct FilterPreset: Codable, Identifiable {
   let id, name: String
@@ -125,6 +126,8 @@ enum Profile {
         ]
         if selected {
           locks["network.proxy.allow_hijacking_localhost"] = true
+        }
+        if selected || app.disableWebRTC == true {
           locks["media.peerconnection.enabled"] = false
         }
         result[app.id] = [

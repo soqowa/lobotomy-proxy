@@ -53,6 +53,24 @@ import Foundation
     precondition(localized("Remove %@", "example.com") == (russian ? "Убрать example.com" : "Remove example.com"))
     precondition(root["PayloadIdentifier"] as? String == Profile.id)
 
+    let zenID = "app.zen-browser.zen"
+    let zen = FilterCatalog.shared.apps.first { $0.id == zenID }!
+    precondition(FilterCatalog.shared.apps.filter { $0.port == zen.port }.count == 1)
+    for selected in [false, true] {
+      let rules = FilterPolicy(domains: p.domains, applications: selected ? [.init(id: zenID, all: true, domains: [])] : []).systemRules
+      let zenSettings = try Profile.preferences(rules)[zenID]!
+      let prefs = zenSettings["Preferences"] as! [String: [String: Any]]
+      let proxy = zenSettings["Proxy"] as! [String: Any]
+      precondition(zenSettings["EnterprisePoliciesEnabled"] as? Bool == true)
+      precondition(proxy["Locked"] as? Bool == true && proxy["Mode"] as? String == (selected ? "manual" : "autoConfig"))
+      if selected {
+        precondition(proxy["HTTPProxy"] as? String == "127.0.0.1:\(zen.port)" && proxy["SSLProxy"] as? String == proxy["HTTPProxy"] as? String)
+      }
+      for key in ["media.peerconnection.enabled", "network.http.http3.enable", "network.proxy.failover_direct"] {
+        precondition(prefs[key]?["Value"] as? Bool == false && prefs[key]?["Status"] as? String == "locked")
+      }
+    }
+
     let inventory = [
       "user": [
         [

@@ -60,6 +60,8 @@ Protected connections use the configured proxy and local filter rules. The relay
 
 In **Overview → Leak check**, open Net.Coffee in a protected browser to inspect the DNS resolvers, WebRTC/UDP results, and time zone it observes. The profile covers `ip.net.coffee` and its test subdomains, so you can also check DNS in a regular window of a supported default browser. [Open the Net.Coffee test](https://ip.net.coffee/claude/)
 
+On each Mac using **Zen**, install the current filter profile and fully quit and reopen Zen. The profile disables WebRTC and HTTP/3 in Zen, including in ordinary windows and domain-only mode. Sites that use WebRTC for calls lose that feature. To send all of Zen’s supported web traffic through the proxy, add Zen under **Filter → Applications** before updating the profile. In `about:policies#active`, check that `media.peerconnection.enabled` under **Preferences** is locked to `false`. A call to the WebRTC API should then produce no ICE candidates. The menu bar shield reports the proxy route.
+
 For **Berlin · CryptoStorm** DNS mode, enter the proxy host as a numeric IP address. The app sends DNS-over-HTTPS requests through the proxy, connects to the returned IPs, and blocks the request if DNS resolution fails. [CryptoStorm resolver details](https://cryptostorm.is/blog/doh)
 
 ## Time zone
@@ -70,7 +72,7 @@ To apply the proxy time zone to the whole Mac, use **Connection → Time zone**.
 
 ## Routing and rollback
 
-Domain rules use split DNS, entries in the hosts file, and TLS hostname checks on port 443. Chrome, Edge, Brave, Arc, Vivaldi, and Firefox receive managed browser settings. A selected app gets a fixed local proxy. Other supported browsers use a proxy auto-configuration (PAC) file for the selected domains. Safari uses system DNS. Desktop clients that support `egressProxyUrl` depend on the client’s operating mode.
+Domain rules use split DNS, entries in the hosts file, and TLS hostname checks on port 443. Chrome, Edge, Brave, Arc, Vivaldi, Firefox, and Zen receive managed browser settings. A selected app gets a fixed local proxy. Other supported browsers use a proxy auto-configuration (PAC) file for the selected domains. Safari uses system DNS. Desktop clients that support `egressProxyUrl` depend on the client’s operating mode.
 
 Direct sockets, virtual machines, some updaters, third-party DNS-over-HTTPS, and VPNs with their own routes can bypass client settings. A successful leak test describes the browser window and network configuration you tested.
 

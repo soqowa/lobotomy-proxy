@@ -115,6 +115,12 @@ struct FilterView: View {
         Text(
           localized("All supported web traffic from selected apps goes through the proxy. They use its time zone when opened normally.")
         ).font(.callout).foregroundStyle(.secondary)
+        if FilterCatalog.shared.apps.contains(where: {
+          $0.disableWebRTC == true && NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.id) != nil
+        }) {
+          Text(localized("The profile turns off WebRTC throughout Zen, including voice and video calls."))
+            .font(.callout).foregroundStyle(.secondary)
+        }
         ForEach(c.draft.applications) { rule in
           if let a = FilterCatalog.shared.apps.first(where: { $0.id == rule.id }) {
             Divider()

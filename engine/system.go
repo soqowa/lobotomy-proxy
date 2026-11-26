@@ -159,6 +159,12 @@ func plist() []byte {
 	return bytes.Replace(legacyPlist(), []byte("</dict><key>KeepAlive"), []byte(specs.String()+"</dict><key>KeepAlive"), 1)
 }
 
+// Releases through 1.7.1 registered the same listeners except for Zen.
+// Only the exact shipped definition may be replaced or removed during migration.
+func preZenServicePlist(data []byte) bool {
+	return fmt.Sprintf("%x", sha256.Sum256(data)) == "291ae454ced1f3315f50e9ba7fba9dcf90f789e209163743b94f55b98253383f"
+}
+
 // A private umask in the privileged staging process can narrow mkdir(0755) to 0700.
 // Only adjust a real root-owned directory used by this installation.
 func readableDirectory(path string) error {
@@ -305,6 +311,11 @@ func uninstallLocked(s Installation) error {
 	spec := plist()
 	if s.Filter == nil {
 		spec = legacyPlist()
+	}
+	if s.Filter != nil {
+		if b, err := os.ReadFile(jobFile); err == nil && preZenServicePlist(b) {
+			spec = b
+		}
 	}
 	acceptedDigests := []string{s.Digest}
 	if t := s.Updating; t != nil {

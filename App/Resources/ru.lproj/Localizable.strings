@@ -146,3 +146,5 @@
 "rule files" = "файлы правил";
 "rule list" = "список правил";
 "system service" = "системная служба";
+
+"The profile turns off WebRTC throughout Zen, including voice and video calls." = "Профиль отключает WebRTC во всех окнах Zen, в том числе для голосовых и видеозвонков.";
