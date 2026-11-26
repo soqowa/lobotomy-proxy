@@ -138,9 +138,11 @@
 "Waiting for the background service." = "Ожидание фоновой службы.";
 "Waiting for the proxy check." = "Ожидаем результат проверки прокси.";
 "Waiting for verification" = "Ожидание проверки";
+"installation state" = "состояние установки";
 "local DNS" = "локальный DNS";
-"macOS hasn’t confirmed the system rules yet." = "macOS ещё не подтвердила системные правила.";
+"macOS hasn’t confirmed the system rules. Check the following: %@." = "macOS не подтвердила системные правила. Проверьте: %@.";
 "macOS profile" = "Профиль macOS";
 "macOS settings reloaded. Quit and reopen the apps listed in the profile status." = "Настройки macOS перечитаны. Полностью перезапустите приложения, указанные в статусе профиля.";
 "rule files" = "файлы правил";
+"rule list" = "список правил";
 "system service" = "системная служба";

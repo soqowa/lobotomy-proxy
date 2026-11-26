@@ -552,11 +552,24 @@ enum Page: String, CaseIterable, Identifiable {
             ])
           }.value
         }
-        let state = try await Task.detached {
-          try JSONDecoder().decode(SystemState.self, from: Tools.run(Tools.engine, ["system"]))
-        }.value
-        guard state.installed, state.policy == desired, state.filter, state.rulesReady ?? state.files else {
-          throw GuardError.message(localized("macOS hasn’t confirmed the system rules yet."))
+        // The service may still be starting or restarting right after installation.
+        var state = SystemState()
+        let limit = ContinuousClock.now.advanced(by: .seconds(12))
+        while true {
+          state = try await Task.detached {
+            try JSONDecoder().decode(SystemState.self, from: Tools.run(Tools.engine, ["system"]))
+          }.value
+          if state.installed, state.policy == desired, state.filter, state.rulesReady ?? state.files { break }
+          guard ContinuousClock.now < limit else {
+            let missing = [
+              !state.installed ? localized("installation state") : nil,
+              state.installed && state.policy != desired ? localized("rule list") : nil,
+              !state.filter ? localized("system service") : nil,
+              !(state.rulesReady ?? state.files) ? localized("rule files") : nil,
+            ].compactMap { $0 }.joined(separator: ", ")
+            throw GuardError.message(localized("macOS hasn’t confirmed the system rules. Check the following: %@.", missing))
+          }
+          try await Task.sleep(for: .milliseconds(400))
         }
         system = state
         let report = await Task.detached { Profile.report(desired) }.value
