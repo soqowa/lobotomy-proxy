@@ -52,7 +52,7 @@ Your draft is saved as you edit. Removing a preset keeps manually added domains 
 
 </details>
 
-To change the app’s appearance, open **menu bar shield → Theme** and choose System, Light, or Dark.
+To change the app’s appearance, open **menu bar shield → Theme** and choose System, Light, or Dark. In the same menu, **Sidebar** switches between **Logo on Top**, with the logo, version and forwarding status above the sections, and **Classic**, with the logo at the bottom.
 
 ## DNS and route checks
 

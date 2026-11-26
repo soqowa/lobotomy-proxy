@@ -26,6 +26,7 @@
 "Checking the proxy exit" = "Проверяем выход прокси";
 "Checking the route." = "Проверяем маршрут.";
 "Choose an .app file…" = "Выбрать файл .app…";
+"Classic" = "Классический";
 "Confirm installation in Device Management. The filter will start automatically." = "Подтвердите установку в «Управлении устройством». Фильтр включится автоматически.";
 "Connect by IP without a DNS lookup" = "IP прокси для подключения без DNS";
 "Connection" = "Подключение";
@@ -60,6 +61,7 @@
 "Leak check" = "Проверка утечек";
 "Light" = "Светлая";
 "Lobotomy Proxy · Filter" = "Lobotomy Proxy · Фильтр";
+"Logo on Top" = "Логотип сверху";
 "Mac time zone set to %@." = "На Mac установлен часовой пояс %@.";
 "Needs attention" = "Что требует внимания";
 "Net.Coffee couldn’t verify Berlin. %@" = "Net.Coffee не подтвердил Берлин. %@";
@@ -106,6 +108,7 @@
 "Save your documents and confirm if an app asks to quit. %@" = "Завершите сохранение документов и подтвердите обычный выход, если приложение запросило его. %@";
 "Server" = "Сервер";
 "Set up your proxy" = "Укажите прокси";
+"Sidebar" = "Боковая панель";
 "Some apps are waiting to start" = "Некоторые приложения ожидают запуска";
 "System" = "Системная";
 "System rules haven’t been verified." = "Системные правила не подтверждены.";

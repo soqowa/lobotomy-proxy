@@ -8,33 +8,117 @@ let accent = Color(
       : NSColor(srgbRed: 0.62, green: 0.16, blue: 0.36, alpha: 1)
   })
 
+struct SidebarStatus: Equatable {
+  enum Tone { case idle, working, good, warning }
+  var title: String
+  var detail: String?
+  var tone: Tone
+}
+
+/// The brand artwork, inked to match the connection state.
 private struct SidebarIllustration: View {
+  let tone: SidebarStatus.Tone
   @Environment(\.colorScheme) private var scheme
 
+  private struct Inks { let light: NSImage?, dark: NSImage? }
+
   private static let source = Bundle.main.url(forResource: BrandArtwork.resource, withExtension: "svg")
-  private static let light = source.flatMap {
-    try? BrandArtwork.image(from: $0, ink: "#8b405d", paper: "#fff4f7")
+  private static func inks(light: (String, String), dark: (String, String)) -> Inks {
+    Inks(
+      light: source.flatMap { try? BrandArtwork.image(from: $0, ink: light.0, paper: light.1) },
+      dark: source.flatMap { try? BrandArtwork.image(from: $0, ink: dark.0, paper: dark.1) })
   }
-  private static let dark = source.flatMap {
-    try? BrandArtwork.image(from: $0, ink: "#4b283a", paper: "#e6b5c8")
+  private static let active = inks(light: ("#8b405d", "#fff4f7"), dark: ("#4b283a", "#e6b5c8"))
+  private static let off = inks(light: ("#8d8790", "#f6f4f6"), dark: ("#2e2b2f", "#8f8a91"))
+  private static let alert = inks(light: ("#a8582a", "#fff3ea"), dark: ("#4a2a17", "#eab48a"))
+
+  var body: some View {
+    let set: Inks = switch tone {
+    case .good, .working: Self.active
+    case .idle: Self.off
+    case .warning: Self.alert
+    }
+    if let mark = scheme == .dark ? set.dark : set.light {
+      Image(nsImage: mark).resizable().interpolation(.high).scaledToFit()
+        .opacity(tone == .idle ? 0.8 : 1)
+        .id(tone).transition(.opacity)
+        .accessibilityHidden(true).allowsHitTesting(false)
+    }
+  }
+}
+
+private struct SidebarHeader: View {
+  let status: SidebarStatus
+
+  private static let version = Bundle.main.object(
+    forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+
+  private var statusColor: AnyShapeStyle {
+    switch status.tone {
+    case .good: AnyShapeStyle(accent)
+    case .warning: AnyShapeStyle(.orange)
+    case .idle, .working: AnyShapeStyle(.secondary)
+    }
   }
 
   var body: some View {
-    if let mark = scheme == .dark ? Self.dark : Self.light {
-      Image(nsImage: mark).resizable().interpolation(.high).scaledToFit()
-        .accessibilityHidden(true).allowsHitTesting(false)
+    VStack(spacing: 12) {
+      SidebarIllustration(tone: status.tone)
+        .frame(maxWidth: .infinity, maxHeight: 132)
+        .padding(.horizontal, 22)
+      VStack(spacing: 5) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(verbatim: "Lobotomy Proxy").font(.system(size: 14, weight: .bold))
+            .lineLimit(1).fixedSize()
+          if let version = Self.version {
+            Text(verbatim: version).font(.system(size: 11).monospacedDigit())
+              .foregroundStyle(.tertiary)
+          }
+        }
+        .accessibilityAddTraits(.isHeader)
+        HStack(spacing: 4) {
+          Text(status.title).lineLimit(1).truncationMode(.tail)
+          if let detail = status.detail, !detail.isEmpty {
+            Text(verbatim: "· " + detail).lineLimit(1).fixedSize().foregroundStyle(.tertiary)
+          }
+        }
+        .font(.system(size: 11.5, weight: .medium))
+        .foregroundStyle(statusColor)
+        .help(status.title)
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .accessibilityElement(children: .combine)
+  }
+}
+
+enum SidebarStyle: String, CaseIterable {
+  /// Navigation on top, artwork in the bottom corner.
+  case classic
+  /// Artwork, name and connection state above the navigation.
+  case portrait
+
+  var title: String {
+    switch self {
+    case .classic: localized("Classic")
+    case .portrait: localized("Logo on Top")
     }
   }
 }
 
 private struct Sidebar: View {
   @Binding var page: Page
+  let status: SidebarStatus
+  let style: SidebarStyle
   let motion: InterfaceMotion
   @ScaledMetric(relativeTo: .body) private var width: CGFloat = 210
   @Namespace private var navigation
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
+      if style == .portrait {
+        SidebarHeader(status: status).padding(.bottom, 22)
+      }
       ForEach(Page.allCases) { item in
         Button {
           page = item
@@ -59,13 +143,18 @@ private struct Sidebar: View {
         .foregroundStyle(page == item ? accent : .primary)
         .accessibilityAddTraits(page == item ? .isSelected : [])
       }
-      Spacer(minLength: 24)
-      SidebarIllustration()
-        .frame(maxWidth: .infinity, maxHeight: 150)
-        .padding(.horizontal, 10)
+      if style == .classic {
+        Spacer(minLength: 24)
+        SidebarIllustration(tone: .good)
+          .frame(maxWidth: .infinity, maxHeight: 150)
+          .padding(.horizontal, 10)
+      } else {
+        Spacer(minLength: 0)
+      }
     }
     .animation(motion.animation, value: page)
-    .padding(.horizontal, 12).padding(.top, 40).padding(.bottom, 23)
+    .animation(motion.animation, value: status)
+    .padding(.horizontal, 12).padding(.top, style == .portrait ? 44 : 40).padding(.bottom, 23)
     .frame(width: width)
     .frame(maxHeight: .infinity)
     .background {
@@ -336,11 +425,25 @@ struct Connection: View {
 
 struct MainWindow: View {
   @ObservedObject var c: Control
+  @AppStorage("sidebarStyle") private var sidebarStyle: SidebarStyle = .portrait
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  private var sidebarStatus: SidebarStatus {
+    let shield = c.menuShield
+    let tone: SidebarStatus.Tone
+    switch shield.symbol {
+    case "checkmark.shield.fill": tone = .good
+    case "xmark.shield", "exclamationmark.shield": tone = .warning
+    default: tone = c.busy || c.phase == "checking" ? .working : .idle
+    }
+    let country = tone == .good ? c.route?.country : nil
+    return SidebarStatus(title: shield.title, detail: country, tone: tone)
+  }
+
   var body: some View {
     let motion = InterfaceMotion(reduced: reduceMotion)
     HStack(spacing: 0) {
-      Sidebar(page: $c.page, motion: motion)
+      Sidebar(page: $c.page, status: sidebarStatus, style: sidebarStyle, motion: motion)
       Divider()
       VStack(spacing: 0) {
         ZStack(alignment: .top) {
@@ -475,6 +578,7 @@ private enum AppTheme: String, CaseIterable {
 struct LobotomyProxyApp: App {
   @StateObject private var control = Control()
   @AppStorage("appTheme") private var theme: AppTheme = .system
+  @AppStorage("sidebarStyle") private var sidebarStyle: SidebarStyle = .portrait
   @Environment(\.openWindow) private var openWindow
   var body: some Scene {
     Window("Lobotomy Proxy", id: "main") {
@@ -497,6 +601,11 @@ struct LobotomyProxyApp: App {
       }
       Picker(localized("Theme"), selection: $theme) {
         ForEach(AppTheme.allCases, id: \.self) { option in
+          Text(option.title).tag(option)
+        }
+      }.pickerStyle(.menu)
+      Picker(localized("Sidebar"), selection: $sidebarStyle) {
+        ForEach(SidebarStyle.allCases, id: \.self) { option in
           Text(option.title).tag(option)
         }
       }.pickerStyle(.menu)
