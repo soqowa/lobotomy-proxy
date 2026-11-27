@@ -37,6 +37,20 @@ import Foundation
     let effective = p.systemRules
     precondition(effective.domains == ["custom.example", "ip.net.coffee"])
     precondition(effective.systemRules == effective && effective.applications == p.applications)
+    var split = FilterPolicy(domains: ["shared.example"], applications: [
+      ApplicationRule(id: browser.id, all: false, domains: ["only-here.example"]),
+      ApplicationRule(id: desktop.id, all: true, domains: ["remembered.example"]),
+    ])
+    let saved = SavedFilterDraft(policy: split, selections: [browser.id: DomainSelection(split.applications[0].domains)])
+    let restored = try JSONDecoder().decode(SavedFilterDraft.self, from: JSONEncoder().encode(saved))
+    precondition(restored.policy == split && restored.selections == saved.selections)
+    let applied = split.systemRules
+    let appliedBrowser = applied.applications.first { $0.id == browser.id }!
+    precondition(!appliedBrowser.all && appliedBrowser.directOthers == true && appliedBrowser.domains == ["only-here.example"])
+    precondition(applied.applications.first { $0.id == desktop.id }?.domains == [])
+    precondition(!applied.domains.contains("only-here.example") && applied.systemRules == applied)
+    split.applications[1].all = false
+    precondition(split.systemRules.applications.first { $0.id == desktop.id }?.domains == ["remembered.example"])
     let effectivePAC = try Profile.pac(effective)
     precondition(effectivePAC.contains(FilterPolicy.diagnosticDomain))
     let data = try Profile.data(p)

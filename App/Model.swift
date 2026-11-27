@@ -218,15 +218,27 @@ enum Page: String, CaseIterable, Identifiable {
   @Published var probeFailed = ""
   private static let draftKey = "FilterDraftWithPresets"
   @Published private var selections: [String: DomainSelection] = [:]
-  var selection: DomainSelection {
-    if let saved = selections[""], saved.domains == draft.domains.sorted() { return saved }
-    return DomainSelection(draft.domains)
+  func selection(for appID: String?) -> DomainSelection {
+    let names = appID.map { id in draft.applications.first { $0.id == id }?.domains ?? [] } ?? draft.domains
+    if let saved = selections[appID ?? ""], saved.domains == names.sorted() { return saved }
+    return DomainSelection(names)
   }
-  func updateSelection(_ mutation: (inout DomainSelection) throws -> Void) throws {
-    var next = selection
+  func updateSelection(for appID: String?, _ mutation: (inout DomainSelection) throws -> Void) throws {
+    var next = selection(for: appID)
     try mutation(&next)
-    draft.domains = try FilterPolicy(domains: next.domains).normalized().domains
-    selections[""] = next
+    let names = try FilterPolicy(domains: next.domains).normalized().domains
+    if let appID {
+      guard let i = draft.applications.firstIndex(where: { $0.id == appID }) else { return }
+      draft.applications[i].domains = names
+    } else {
+      draft.domains = names
+    }
+    selections[appID ?? ""] = next
+    edited()
+  }
+  func setAllRequests(_ all: Bool, for id: String) {
+    guard let i = draft.applications.firstIndex(where: { $0.id == id }) else { return }
+    draft.applications[i].all = all
     edited()
   }
   func removeApp(_ id: String) {
@@ -272,7 +284,7 @@ enum Page: String, CaseIterable, Identifiable {
       let saved = try? JSONDecoder().decode(SavedFilterDraft.self, from: data)
     {
       draft = saved.policy
-      selections = saved.selections.filter { $0.key.isEmpty }
+      selections = saved.selections
       draftLoaded = true
     } else if let d = UserDefaults.standard.data(forKey: "FilterDraftV3"),
       let saved = try? JSONDecoder().decode(FilterPolicy.self, from: d)
@@ -280,7 +292,6 @@ enum Page: String, CaseIterable, Identifiable {
       draft = saved
       draftLoaded = true
     }
-    draft = draft.fullApplications
     do { try BackgroundRelay.refreshInstalledJob() } catch { notice = error.localizedDescription }
     refresh()
     let poll = Timer(timeInterval: 4, repeats: true) { [weak self] _ in
@@ -315,9 +326,7 @@ enum Page: String, CaseIterable, Identifiable {
           let migrated = DomainSelection(
             draft.domains, migratePresets: FilterCatalog.shared.presets)
           selections[""] = migrated
-
         }
-        draft = draft.fullApplications
         draftLoaded = true
       }
       inspected = result != nil
@@ -401,7 +410,7 @@ enum Page: String, CaseIterable, Identifiable {
   }
   var diagnosticsBrowsers: [ManagedApp] {
     FilterCatalog.shared.apps.filter { a in
-      a.adapter != "desktop" && system.policy?.applications.contains { $0.id == a.id } == true
+      a.adapter != "desktop" && system.policy?.applications.contains { $0.id == a.id && $0.all } == true
         && NSWorkspace.shared.urlForApplication(withBundleIdentifier: a.id) != nil
     }
   }
@@ -604,6 +613,7 @@ enum Page: String, CaseIterable, Identifiable {
   }
   func openDiagnostics(_ app: ManagedApp) {
     guard !busy, phase == "passing", browserRules,
+      diagnosticsBrowsers.contains(where: { $0.id == app.id }),
       let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.id)
     else { return }
     busy = true

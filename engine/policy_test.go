@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -19,7 +20,7 @@ import (
 
 func TestCustomScopeIsolation(t *testing.T) {
 	a, b := catalog.Apps[0].ID, catalog.Apps[1].ID
-	p := Policy{[]string{"*.PUBLIC.example.", "public.example"}, []AppRule{{a, false, []string{"allowed.example"}}, {b, true, nil}}}
+	p := Policy{[]string{"*.PUBLIC.example.", "public.example"}, []AppRule{{ID: a, Domains: []string{"allowed.example"}}, {ID: b, All: true}}}
 	if e := p.validate(); e != nil || !slices.Equal(p.Domains, []string{"public.example"}) {
 		t.Fatalf("%v: %v", p, e)
 	}
@@ -29,10 +30,10 @@ func TestCustomScopeIsolation(t *testing.T) {
 		ok          bool
 	}{
 		{"", "child.public.example", 443, true}, {"", "child.public.example", 80, false}, {"", "almostpublic.example", 443, false},
-		{a, "child.allowed.example", 80, true}, {a, "public.example", 443, false}, {b, "other.example", 443, true},
+		{a, "child.allowed.example", 80, true}, {a, "public.example", 443, true}, {b, "other.example", 443, true},
 		{b, "127.0.0.1", 443, false}, {b, "::1", 443, false}, {b, "1.1.1.1", 443, true}, {"missing", "other.example", 443, false},
 	} {
-		if p.allows(tc.scope, tc.host, tc.port) != tc.ok {
+		if (p.routeFor(tc.scope, tc.host, tc.port) == proxyRoute) != tc.ok {
 			t.Errorf("scope: %+v", tc)
 		}
 	}
@@ -79,7 +80,7 @@ func TestApplicationProxyForwardAndOutage(t *testing.T) {
 	defer os.RemoveAll(dir)
 	path := filepath.Join(dir, "worker")
 	scope := catalog.Apps[0].ID
-	p := Policy{Applications: []AppRule{{scope, false, []string{"allowed.example"}}}}
+	p := Policy{Applications: []AppRule{{ID: scope, Domains: []string{"allowed.example"}}}}
 	server := httptest.NewServer(applicationProxy{scope, path, p}.handler())
 	defer server.Close()
 	proxy, _ := url.Parse(server.URL)
@@ -177,5 +178,94 @@ func TestPreZenServicePlistMigration(t *testing.T) {
 	prior := bytes.Replace(current, zenSocket, nil, 1)
 	if !preZenServicePlist(prior) || preZenServicePlist(current) || preZenServicePlist(append(prior, ' ')) {
 		t.Fatal("migration must recognize exactly the pre-Zen service definition")
+	}
+}
+
+func TestSelectiveAppNeverFallsBackForProtectedNames(t *testing.T) {
+	scope := catalog.Apps[0].ID
+	policy := Policy{Domains: []string{"shared.example"}, Applications: []AppRule{
+		{ID: scope, Domains: []string{"private.example"}, DirectOthers: true},
+	}}
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, "direct origin")
+	}))
+	defer origin.Close()
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil || host != "ordinary.example." {
+			t.Errorf("unexpected direct dial to %s", addr)
+			return nil, fmt.Errorf("unexpected destination")
+		}
+		return (&net.Dialer{}).DialContext(ctx, network, origin.Listener.Addr().String())
+	}
+	// A verified local profile with an unavailable upstream has a closed proxy gate.
+	dir, err := os.MkdirTemp("/tmp", "pg-split-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	path := filepath.Join(dir, "worker")
+	worker, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer worker.Close()
+	go accept(worker, func(conn net.Conn) {
+		line, err := limitedLines(conn)
+		if err != nil {
+			return
+		}
+		app, host, port := parseDestination(line)
+		forwardRoute(conn, host, port, policy.routeFor(app, host, port), Config{}, dial, &gate{}, nil)
+	})
+	proxy := httptest.NewServer(applicationProxy{scope, path, policy}.handler())
+	defer proxy.Close()
+	u, _ := url.Parse(proxy.URL)
+	tr := &http.Transport{Proxy: http.ProxyURL(u)}
+	defer tr.CloseIdleConnections()
+	client := http.Client{Transport: tr, Timeout: 3 * time.Second}
+	for _, tc := range []struct {
+		host string
+		code int
+	}{
+		{"api.private.example", 502}, {"static.shared.example", 502}, {"ordinary.example", 200},
+	} {
+		resp, err := client.Get("http://" + tc.host + "/")
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != tc.code || (tc.code == 200 && string(body) != "direct origin") {
+			t.Fatalf("%s: status %d", tc.host, resp.StatusCode)
+		}
+		conn, err := net.DialTimeout("tcp", u.Host, time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn.SetDeadline(time.Now().Add(3 * time.Second))
+		fmt.Fprintf(conn, "CONNECT %s:443 HTTP/1.1\r\nHost: %s:443\r\n\r\n", tc.host, tc.host)
+		reply, err := http.ReadResponse(bufio.NewReader(conn), &http.Request{Method: "CONNECT"})
+		conn.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply.Body.Close()
+		if reply.StatusCode != tc.code {
+			t.Errorf("%s CONNECT: %d", tc.host, reply.StatusCode)
+		}
+	}
+	for _, host := range []string{"127.0.0.1", "::1", "8.8.8.8", "device.local", "localhost", "bad/name"} {
+		if policy.routeFor(scope, host, 443) != blockedRoute {
+			t.Errorf("unexpected route for %s", host)
+		}
+	}
+	if policy.routeFor("unconfigured", "ordinary.example", 443) != blockedRoute {
+		t.Fatal("unconfigured app acquired direct forwarding")
+	}
+	for _, addr := range []string{"127.0.0.1:443", "[::1]:443", "10.0.0.1:80", "[::ffff:192.168.0.1]:80"} {
+		if publicDialer.Control("tcp", addr, nil) == nil {
+			t.Errorf("direct socket allowed %s", addr)
+		}
 	}
 }

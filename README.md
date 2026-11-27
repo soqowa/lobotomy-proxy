@@ -41,14 +41,14 @@ Place **Lobotomy Proxy.app** next to **Proxy Guard.app** and open the new versio
 The app follows your Mac’s primary language. Russian selects the Russian interface. Every other language selects English, even if Russian appears later in your preferred languages. Reopen the app after changing the language in System Settings.
 
 1. **Connect your proxy.** In Connection, choose HTTP, HTTPS, or SOCKS5 and enter the host, port, and credentials. Test and save the connection. The app checks the exit IP against two services, tests DNS, and stores the credentials in your macOS Keychain.
-2. **Choose what to route.** In Filter, add individual domains or select one or more presets. Each domain includes its subdomains. Add an app to route all of its supported web traffic through the proxy.
+2. **Choose what to route.** In Filter, add individual domains or select one or more presets. Each domain includes its subdomains. For each app, choose **All requests** or **Only domains**. In Only domains, add domains or presets for that app. Shared domains stay protected in both modes.
 3. **Install the profile.** In Filter, update the profile and open System Settings. Under **General → Device Management**, approve the Lobotomy Proxy profile. macOS may ask for administrator privileges to install the local service and DNS rules.
 4. **Check the shield.** Forwarding starts automatically once the configuration is verified. A checkmark in the menu bar shield means the route is verified. If a check fails, click the shield to see the reason and open Overview.
 
 <details>
 <summary>How filter edits take effect</summary>
 
-Your draft is saved as you edit. Removing a preset keeps manually added domains and domains from other selected presets. Updating a profile from an older version switches its selected apps to all-sites routing. During an update, the relay uses the available system rules and blocks forwarding if it cannot verify the new configuration.
+Your draft is saved as you edit. Removing a preset keeps manually added domains and domains from other selected presets. Switching to All requests keeps the app’s domain list in the draft. The installed rule changes after you update the profile. During an update, the relay uses the available system rules and blocks forwarding if it cannot verify the new configuration.
 
 </details>
 
@@ -58,7 +58,7 @@ To change the app’s appearance, open **menu bar shield → Theme** and choose 
 
 Protected connections use the configured proxy and local filter rules. The relay verifies the exit through the proxy about every 40 seconds. Two independent HTTPS services must agree on the public IP and country. For an unchanged exit, the relay keeps the verified time zone in memory for up to one hour. A changed exit needs a fresh time zone check. Cloudflare Trace and Country check the IP and country while the cached time zone is valid. IPWho supplies a fresh time zone on startup, after an exit change and when the cached time zone expires. If a service times out or rate-limits requests, the relay tries the remaining services, including ifconfig.co when a fresh zone is needed. Forwarding stays closed unless the checks pass. [Country API](https://country.is/) · [IPWho API](https://ipwhois.io/documentation) · [ifconfig.co](https://ifconfig.co/)
 
-In **Overview → Leak check**, open Net.Coffee in a protected browser to inspect the DNS resolvers, WebRTC/UDP results, and time zone it observes. The profile covers `ip.net.coffee` and its test subdomains, so you can also check DNS in a regular window of a supported default browser. [Open the Net.Coffee test](https://ip.net.coffee/claude/)
+In **Overview → Leak check**, open Net.Coffee in a browser set to **All requests** to inspect the DNS resolvers, WebRTC/UDP results, and time zone it observes. The profile covers `ip.net.coffee` and its test subdomains, so you can also check DNS in a regular window of a supported default browser. [Open the Net.Coffee test](https://ip.net.coffee/claude/)
 
 On each Mac using **Zen**, install the current filter profile and fully quit and reopen Zen. The profile disables WebRTC and HTTP/3 in Zen, including in ordinary windows and domain-only mode. Sites that use WebRTC for calls lose that feature. To send all of Zen’s supported web traffic through the proxy, add Zen under **Filter → Applications** before updating the profile. In `about:policies#active`, check that `media.peerconnection.enabled` under **Preferences** is locked to `false`. A call to the WebRTC API should then produce no ICE candidates. The menu bar shield reports the proxy route.
 
@@ -72,7 +72,7 @@ To apply the proxy time zone to the whole Mac, use **Connection → Time zone**.
 
 ## Routing and rollback
 
-Domain rules use split DNS, entries in the hosts file, and TLS hostname checks on port 443. Chrome, Edge, Brave, Arc, Vivaldi, Firefox, and Zen receive managed browser settings. A selected app gets a fixed local proxy. Other supported browsers use a proxy auto-configuration (PAC) file for the selected domains. Safari uses system DNS. Desktop clients that support `egressProxyUrl` depend on the client’s operating mode.
+Domain rules use split DNS, entries in the hosts file, and TLS hostname checks on port 443. Chrome, Edge, Brave, Arc, Vivaldi, Firefox, and Zen receive managed browser settings. A selected app gets a fixed local proxy. In Only domains, its own list and the shared list go through the configured upstream proxy. Other public hostnames connect directly from the local filter, using the Mac’s DNS and routing. IP literals and private destinations are blocked in this mode. Failure to connect to a protected destination never triggers a direct retry. Other supported browsers use a proxy auto-configuration (PAC) file for the selected domains. Safari uses system DNS. Desktop clients that support `egressProxyUrl` depend on the client’s operating mode.
 
 Direct sockets, virtual machines, some updaters, third-party DNS-over-HTTPS, and VPNs with their own routes can bypass client settings. A successful leak test describes the browser window and network configuration you tested.
 

@@ -55,14 +55,14 @@ type applicationProxy struct {
 	policy Policy
 }
 
-func (p applicationProxy) dial(_ context.Context, _, addr string) (net.Conn, error) {
-	host, port, e := net.SplitHostPort(addr)
-	if e != nil {
-		return nil, e
+func (p applicationProxy) dial(_ context.Context, _ string, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
 	}
 	host = canonical(host)
-	n, e := strconv.Atoi(port)
-	if e != nil || !p.policy.allows(p.scope, host, n) {
+	n, err := strconv.Atoi(port)
+	if err != nil || p.policy.routeFor(p.scope, host, n) == blockedRoute {
 		return nil, errors.New(message("address blocked by a rule"))
 	}
 	return workerDial(p.path, p.scope, host, n)
@@ -110,7 +110,7 @@ func (p applicationProxy) handler() http.Handler {
 		if r.URL.Port() != "" {
 			port, _ = strconv.Atoi(r.URL.Port())
 		}
-		if !p.policy.allows(p.scope, canonical(r.URL.Hostname()), port) {
+		if p.policy.routeFor(p.scope, canonical(r.URL.Hostname()), port) == blockedRoute {
 			http.Error(w, "Destination denied", 403)
 			return
 		}

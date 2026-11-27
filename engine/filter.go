@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"os/exec"
 	"strconv"
@@ -300,34 +301,70 @@ type Event struct {
 }
 
 func emit(s, m string, r *Report) { _ = json.NewEncoder(os.Stdout).Encode(Event{s, m, r}) }
+
+// The app listener is reachable on loopback. Never give it a direct path to local
+// services, including via DNS names that resolve to private or loopback addresses.
+var publicDialer = net.Dialer{
+	Timeout: 10 * time.Second,
+	Control: func(_, address string, _ syscall.RawConn) error {
+		endpoint, err := netip.ParseAddrPort(address)
+		ip := endpoint.Addr().Unmap()
+		if err != nil || !ip.IsGlobalUnicast() || ip.IsPrivate() {
+			return errors.New(message("address blocked by a rule"))
+		}
+		return nil
+	},
+}
+
 func forward(client net.Conn, c Config, g *gate, healthy func() bool, faults chan<- struct{}) {
 	client.SetDeadline(time.Now().Add(12 * time.Second))
 	line, e := limitedLines(client)
 	scope, host, port := parseDestination(line)
-	if e != nil || !activePolicy.allows(scope, host, port) || !launchPermissions.allowed(scope) || !healthy() || !g.admit(client) {
+	route := activePolicy.routeFor(scope, host, port)
+	if e != nil || route == blockedRoute || !launchPermissions.allowed(scope) || !healthy() {
 		return
 	}
-	defer g.forget(client)
 	untrack := launchPermissions.track(scope, client)
 	defer untrack()
-	remote, e := c.dial(context.Background(), host, port)
-	if errors.Is(e, errNoAddress) {
-		return
-	}
-	if e != nil {
-		g.closeAll()
-		select {
-		case faults <- struct{}{}:
-		default:
+	forwardRoute(client, host, port, route, c, publicDialer.DialContext, g, faults)
+}
+
+func forwardRoute(client net.Conn, host string, port int, route destinationRoute, c Config,
+	direct func(context.Context, string, string) (net.Conn, error), g *gate, faults chan<- struct{}) {
+	var remote net.Conn
+	var err error
+	switch route {
+	case directRoute:
+		remote, err = direct(context.Background(), "tcp", net.JoinHostPort(host+".", strconv.Itoa(port)))
+		if err != nil {
+			return
 		}
+	case proxyRoute:
+		if !g.admit(client) {
+			return
+		}
+		defer g.forget(client)
+		remote, err = c.dial(context.Background(), host, port)
+		if err != nil {
+			if !errors.Is(err, errNoAddress) {
+				g.closeAll()
+				select {
+				case faults <- struct{}{}:
+				default:
+				}
+			}
+			return
+		}
+		if !g.admit(remote) {
+			remote.Close()
+			return
+		}
+		defer g.forget(remote)
+	default:
 		return
 	}
 	defer remote.Close()
-	if !g.admit(remote) {
-		return
-	}
-	defer g.forget(remote)
-	if _, e = io.WriteString(client, "OK\n"); e != nil {
+	if _, err = io.WriteString(client, "OK\n"); err != nil {
 		return
 	}
 	client.SetDeadline(time.Time{})

@@ -313,7 +313,7 @@ struct Dashboard: View {
             Button(localized("Check DNS in Browser")) { c.openDNSPage() }
               .disabled(c.busy || c.phase != "passing" || !c.diagnosticRuleInstalled)
           } else {
-            Text(localized("Add a supported browser to the filter to run the check in that app."))
+            Text(localized("For the full leak check, select All requests for a supported browser in Filter."))
               .font(.callout).foregroundStyle(.secondary)
           }
         } else if c.diagnosticsBrowsers.count == 1, let browser = c.diagnosticsBrowsers.first {

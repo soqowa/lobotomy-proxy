@@ -36,9 +36,10 @@ func init() {
 }
 
 type AppRule struct {
-	ID      string   `json:"id"`
-	All     bool     `json:"all"`
-	Domains []string `json:"domains"`
+	ID           string   `json:"id"`
+	All          bool     `json:"all"`
+	Domains      []string `json:"domains"`
+	DirectOthers bool     `json:"directOthers,omitempty"`
 }
 type Policy struct {
 	Domains      []string  `json:"domains"`
@@ -103,27 +104,53 @@ func matches(domains []string, host string) bool {
 	}
 	return false
 }
-func (p Policy) allows(scope, host string, port int) bool {
+
+type destinationRoute int
+
+const (
+	blockedRoute destinationRoute = iota
+	proxyRoute
+	directRoute
+)
+
+func (p Policy) routeFor(scope, host string, port int) destinationRoute {
 	if port < 1 || port > 65535 {
-		return false
+		return blockedRoute
 	}
 	if scope == "" {
-		return port == 443 && matches(p.Domains, host)
+		if port == 443 && matches(p.Domains, host) {
+			return proxyRoute
+		}
+		return blockedRoute
 	}
 	for _, r := range p.Applications {
 		if r.ID != scope {
 			continue
 		}
-		if !r.All {
-			return matches(r.Domains, host)
+		if r.All {
+			if ip, err := netip.ParseAddr(host); err == nil {
+				if ip.IsGlobalUnicast() && !ip.IsPrivate() {
+					return proxyRoute
+				}
+			} else if validInternetName(host) {
+				return proxyRoute
+			}
+		} else if matches(r.Domains, host) || matches(p.Domains, host) {
+			return proxyRoute
+		} else if r.DirectOthers && validInternetName(host) {
+			return directRoute
 		}
-		if ip, e := netip.ParseAddr(host); e == nil {
-			return ip.IsGlobalUnicast() && !ip.IsPrivate()
-		}
-		return validName(host) && strings.Contains(host, ".") && !strings.HasSuffix(host, ".local") && !strings.HasSuffix(host, ".localhost")
+		break
 	}
-	return false
+	return blockedRoute
 }
+
+func validInternetName(host string) bool {
+	_, ipErr := netip.ParseAddr(host)
+	return ipErr != nil && validName(host) && strings.Contains(host, ".") &&
+		!strings.HasSuffix(host, ".local") && !strings.HasSuffix(host, ".localhost")
+}
+
 func (p Policy) stamp() string {
 	data, _ := json.Marshal(p)
 	return fmt.Sprintf("%x", sha256.Sum256(data))

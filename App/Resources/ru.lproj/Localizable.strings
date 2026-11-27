@@ -1,8 +1,7 @@
 "A background process with the same name is running without a Lobotomy Proxy service file." = "Найден одноимённый фоновый процесс без файла Lobotomy Proxy.";
 "Add" = "Добавить";
 "Add a domain or enter several separated by commas" = "Добавить домен или несколько через запятую";
-"Add a supported browser to the filter to run the check in that app." = "Для проверки в отдельном приложении добавьте поддерживаемый браузер в фильтр.";
-"All supported web traffic from selected apps goes through the proxy. They use its time zone when opened normally." = "Весь поддерживаемый веб-трафик выбранных приложений идёт через прокси. При обычном запуске они получают его часовой пояс.";
+"For the full leak check, select All requests for a supported browser in Filter." = "Для полной проверки выберите «Все запросы» у поддерживаемого браузера в разделе «Фильтр».";
 "An older filter is installed" = "Установлена прежняя версия фильтра";
 "An older profile is installed" = "Установлен профиль прежней версии";
 "Another configuration owns the background service file." = "Файл фоновой службы занят другой настройкой.";
@@ -148,3 +147,9 @@
 "system service" = "системная служба";
 
 "The profile turns off WebRTC throughout Zen, including voice and video calls." = "Профиль отключает WebRTC во всех окнах Zen, в том числе для голосовых и видеозвонков.";
+"All requests" = "Все запросы";
+"Only domains" = "Только домены";
+"Presets" = "Пресеты";
+"Proxy routing for %@" = "Маршрутизация для %@";
+"Selected apps use the proxy time zone." = "Выбранные приложения используют часовой пояс прокси.";
+"App and shared domains use the proxy. Other sites connect directly." = "Домены приложения и общие домены идут через прокси. Остальные сайты открываются напрямую.";

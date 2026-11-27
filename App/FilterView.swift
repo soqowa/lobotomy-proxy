@@ -35,25 +35,130 @@ private struct Wrap: Layout {
     }
   }
 }
-struct FilterView: View {
+private struct DomainEditor: View {
   @ObservedObject var c: Control
+  let appID: String?
   let motion: InterfaceMotion
   @State private var entry = ""
   @State private var error = ""
-  @State private var guide = false
-  @State private var rollback = false
-  func edit(_ change: (inout DomainSelection) throws -> Void) {
+
+  private var selection: DomainSelection { c.selection(for: appID) }
+  private func edit(_ change: (inout DomainSelection) throws -> Void) {
     do {
-      try c.updateSelection(change)
+      try c.updateSelection(for: appID, change)
       error = ""
     } catch { self.error = error.localizedDescription }
   }
-  func add() {
+  private func add() {
     let names = FilterPolicy.words(entry)
     guard !names.isEmpty else { return }
     edit { $0.manual.formUnion(try FilterPolicy(domains: names).normalized().domains) }
     if error.isEmpty { entry = "" }
   }
+  private func presetBinding(_ preset: FilterPreset) -> Binding<Bool> {
+    Binding(get: { selection.sources[preset.id] != nil }, set: { _ in edit { $0.toggle(preset) } })
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if appID == nil {
+        Wrap {
+          ForEach(FilterCatalog.shared.presets) { p in
+            Toggle(isOn: presetBinding(p)) {
+              Label(p.name, systemImage: selection.sources[p.id] == nil ? "plus" : "checkmark")
+            }.toggleStyle(.button).controlSize(.small)
+          }
+        }
+      }
+      HStack {
+        TextField(appID == nil ? localized("Add a domain or enter several separated by commas") : "example.com", text: $entry).textFieldStyle(
+          .roundedBorder
+        ).onSubmit { add() }
+        Button(localized("Add")) { add() }.disabled(FilterPolicy.words(entry).isEmpty)
+        if appID != nil {
+          Menu(localized("Presets")) {
+            ForEach(FilterCatalog.shared.presets) { p in
+              Toggle(p.name, isOn: presetBinding(p))
+            }
+          }.fixedSize()
+        }
+      }
+      if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
+      if !selection.domains.isEmpty {
+        Wrap {
+          ForEach(selection.domains, id: \.self) { d in
+            HStack(spacing: 6) {
+              Text(d).font(.callout)
+              Button {
+                edit { $0.remove(d) }
+              } label: {
+                Image(systemName: "xmark").font(.system(size: 9, weight: .semibold))
+              }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel(localized("Remove %@", d))
+            }
+            .padding(.horizontal, 9).padding(.vertical, 5).background(
+              .quaternary.opacity(0.6), in: Capsule())
+            .transition(motion.item)
+          }
+        }
+      }
+    }
+  }
+}
+
+private struct ApplicationRoutingRow: View {
+  @ObservedObject var c: Control
+  let app: ManagedApp
+  let rule: ApplicationRule
+  let motion: InterfaceMotion
+
+  private var scopePicker: some View {
+    Picker(localized("Proxy routing for %@", app.name), selection: Binding(
+      get: { rule.all }, set: { c.setAllRequests($0, for: app.id) }
+    )) {
+      Text(localized("All requests")).tag(true)
+      Text(localized("Only domains")).tag(false)
+    }.pickerStyle(.segmented).labelsHidden().fixedSize()
+  }
+  private var title: some View {
+    HStack(spacing: 8) {
+      if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.id) {
+        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable()
+          .frame(width: 23, height: 23).accessibilityHidden(true)
+      }
+      Text(app.name).fontWeight(.medium).fixedSize()
+    }
+  }
+  private var remove: some View {
+    Button { c.removeApp(app.id) } label: { Image(systemName: "minus.circle") }
+      .buttonStyle(.plain).foregroundStyle(.secondary)
+      .accessibilityLabel(localized("Remove %@", app.name))
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 12) {
+          title.frame(minWidth: 148, alignment: .leading)
+          Spacer(minLength: 0)
+          scopePicker
+          remove
+        }
+        VStack(alignment: .leading, spacing: 10) {
+          HStack { title; Spacer(); remove }
+          scopePicker
+        }
+      }
+      if !rule.all {
+        DomainEditor(c: c, appID: app.id, motion: motion)
+        Text(localized("App and shared domains use the proxy. Other sites connect directly.")).font(.caption).foregroundStyle(.secondary)
+      }
+    }.padding(.vertical, 3)
+  }
+}
+
+struct FilterView: View {
+  @ObservedObject var c: Control
+  let motion: InterfaceMotion
+  @State private var guide = false
+  @State private var rollback = false
   var body: some View {
     VStack(alignment: .leading, spacing: 24) {
       HStack {
@@ -64,38 +169,7 @@ struct FilterView: View {
       }
       Surface {
         Text(localized("Domains")).font(.headline)
-        HStack(spacing: 7) {
-          ForEach(FilterCatalog.shared.presets) { p in
-            let on = c.selection.sources[p.id] != nil
-            Toggle(isOn: Binding(get: { on }, set: { _ in edit { $0.toggle(p) } })) {
-              Label(p.name, systemImage: on ? "checkmark" : "plus")
-            }.toggleStyle(.button).controlSize(.small)
-          }
-        }
-        HStack {
-          TextField(localized("Add a domain or enter several separated by commas"), text: $entry).textFieldStyle(
-            .roundedBorder
-          ).onSubmit { add() }
-          Button(localized("Add")) { add() }.disabled(FilterPolicy.words(entry).isEmpty)
-        }
-        if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
-        if !c.draft.domains.isEmpty {
-          Wrap {
-            ForEach(c.draft.domains, id: \.self) { d in
-              HStack(spacing: 6) {
-                Text(d).font(.callout)
-                Button {
-                  edit { $0.remove(d) }
-                } label: {
-                  Image(systemName: "xmark").font(.system(size: 9, weight: .semibold))
-                }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel(localized("Remove %@", d))
-              }
-              .padding(.horizontal, 9).padding(.vertical, 5).background(
-                .quaternary.opacity(0.6), in: Capsule())
-              .transition(motion.item)
-            }
-          }
-        }
+        DomainEditor(c: c, appID: nil, motion: motion)
       }.disabled(!c.draftLoaded || c.busy)
       Surface {
         HStack {
@@ -113,7 +187,7 @@ struct FilterView: View {
           }.fixedSize()
         }
         Text(
-          localized("All supported web traffic from selected apps goes through the proxy. They use its time zone when opened normally.")
+          localized("Selected apps use the proxy time zone.")
         ).font(.callout).foregroundStyle(.secondary)
         if FilterCatalog.shared.apps.contains(where: {
           $0.disableWebRTC == true && NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0.id) != nil
@@ -124,20 +198,7 @@ struct FilterView: View {
         ForEach(c.draft.applications) { rule in
           if let a = FilterCatalog.shared.apps.first(where: { $0.id == rule.id }) {
             Divider()
-            HStack(spacing: 10) {
-              if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: a.id) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(
-                  width: 23, height: 23)
-              }
-              Text(a.name)
-              Spacer()
-              Button {
-                c.removeApp(a.id)
-              } label: {
-                Image(systemName: "minus.circle")
-              }.buttonStyle(.plain).foregroundStyle(.secondary).accessibilityLabel(
-                localized("Remove %@", a.name))
-            }.transition(motion.item)
+            ApplicationRoutingRow(c: c, app: a, rule: rule, motion: motion).transition(motion.item)
           }
         }
       }.disabled(!c.draftLoaded || c.busy)

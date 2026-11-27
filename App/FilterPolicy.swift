@@ -26,6 +26,7 @@ struct ApplicationRule: Codable, Equatable, Identifiable {
   let id: String
   var all: Bool
   var domains: [String]
+  var directOthers: Bool? = nil
 }
 struct FilterPolicy: Codable, Equatable {
   var domains: [String] = []
@@ -48,16 +49,13 @@ struct FilterPolicy: Codable, Equatable {
   // the split resolver, TLS filter and browser PAC, including on upgrades from older profiles.
   static let diagnosticDomain = "ip.net.coffee"
   var systemRules: Self {
-    var p = fullApplications
-    p.domains = Set(p.domains + [Self.diagnosticDomain]).sorted()
-    return p
-  }
-  var fullApplications: Self {
-    Self(
-      domains: domains,
-      applications: applications.map { ApplicationRule(id: $0.id, all: true, domains: []) }.sorted {
-        $0.id < $1.id
-      })
+    var rules = self
+    rules.domains = Set(domains + [Self.diagnosticDomain]).sorted()
+    rules.applications = applications.map { rule in
+      ApplicationRule(id: rule.id, all: rule.all, domains: rule.all ? [] : rule.domains.sorted(),
+        directOthers: rule.all ? nil : true)
+    }.sorted { $0.id < $1.id }
+    return rules
   }
   func normalized() throws -> Self {
     let input = try json()
